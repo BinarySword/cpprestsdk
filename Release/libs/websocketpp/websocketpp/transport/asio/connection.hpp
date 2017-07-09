@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Peter Thorson. All rights reserved.
+ * Copyright (c) 2013, Peter Thorson. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,27 +28,22 @@
 #ifndef WEBSOCKETPP_TRANSPORT_ASIO_CON_HPP
 #define WEBSOCKETPP_TRANSPORT_ASIO_CON_HPP
 
-#include <websocketpp/transport/asio/base.hpp>
-
-#include <websocketpp/transport/base/connection.hpp>
-
-#include <websocketpp/logger/levels.hpp>
-#include <websocketpp/http/constants.hpp>
-
-#include <websocketpp/base64/base64.hpp>
-#include <websocketpp/error.hpp>
-
 #include <websocketpp/common/cpp11.hpp>
 #include <websocketpp/common/memory.hpp>
 #include <websocketpp/common/functional.hpp>
 #include <websocketpp/common/connection_hdl.hpp>
+#include <websocketpp/logger/levels.hpp>
+#include <websocketpp/http/constants.hpp>
+#include <websocketpp/transport/asio/base.hpp>
+#include <websocketpp/transport/base/connection.hpp>
+
+#include <websocketpp/base64/base64.hpp>
+#include <websocketpp/error.hpp>
 
 #include <boost/asio.hpp>
 #include <boost/system/error_code.hpp>
 
-#include <istream>
 #include <sstream>
-#include <string>
 #include <vector>
 
 namespace websocketpp {
@@ -170,19 +165,19 @@ public:
      *
      * @param ec A status value
      */
-    void set_proxy(std::string const & uri, lib::error_code & ec) {
+    void set_proxy(const std::string & uri, lib::error_code & ec) {
         // TODO: return errors for illegal URIs here?
         // TODO: should https urls be illegal for the moment?
         m_proxy = uri;
-        m_proxy_data = lib::make_shared<proxy_data>();
+        m_proxy_data.reset(new proxy_data());
         ec = lib::error_code();
     }
 
     /// Set the proxy to connect through (exception)
-    void set_proxy(std::string const & uri) {
+    void set_proxy(const std::string & uri) {
         lib::error_code ec;
         set_proxy(uri,ec);
-        if (ec) { throw exception(ec); }
+        if (ec) { throw ec; }
     }
 
     /// Set the basic auth credentials to use (exception free)
@@ -198,8 +193,8 @@ public:
      *
      * @param ec A status value
      */
-    void set_proxy_basic_auth(std::string const & username, std::string const &
-        password, lib::error_code & ec)
+    void set_proxy_basic_auth(const std::string & username, const
+        std::string & password, lib::error_code & ec)
     {
         if (!m_proxy_data) {
             ec = make_error_code(websocketpp::error::invalid_state);
@@ -213,12 +208,12 @@ public:
     }
 
     /// Set the basic auth credentials to use (exception)
-    void set_proxy_basic_auth(std::string const & username, std::string const &
-        password)
+    void set_proxy_basic_auth(const std::string & username, const
+        std::string & password)
     {
         lib::error_code ec;
         set_proxy_basic_auth(username,password,ec);
-        if (ec) { throw exception(ec); }
+        if (ec) { throw ec; }
     }
 
     /// Set the proxy timeout duration (exception free)
@@ -245,10 +240,10 @@ public:
     void set_proxy_timeout(long duration) {
         lib::error_code ec;
         set_proxy_timeout(duration,ec);
-        if (ec) { throw exception(ec); }
+        if (ec) { throw ec; }
     }
 
-    std::string const & get_proxy() const {
+    const std::string & get_proxy() const {
         return m_proxy;
     }
 
@@ -295,9 +290,11 @@ public:
      * needed.
      */
     timer_ptr set_timer(long duration, timer_handler callback) {
-        timer_ptr new_timer = lib::make_shared<boost::asio::deadline_timer>(
-            lib::ref(*m_io_service),
-            boost::posix_time::milliseconds(duration)
+        timer_ptr new_timer(
+            new boost::asio::deadline_timer(
+                *m_io_service,
+                boost::posix_time::milliseconds(duration)
+            )
         );
 
         if (config::enable_multithreading) {
@@ -326,11 +323,11 @@ public:
      *
      * TODO: candidate for protected status
      *
-     * @param post_timer Pointer to the timer in question
+     * @param t Pointer to the timer in question
      * @param callback The function to call back
      * @param ec The status code
      */
-    void handle_timer(timer_ptr, timer_handler callback,
+    void handle_timer(timer_ptr t, timer_handler callback,
         boost::system::error_code const & ec)
     {
         if (ec) {
@@ -422,8 +419,7 @@ protected:
         m_io_service = io_service;
 
         if (config::enable_multithreading) {
-            m_strand = lib::make_shared<boost::asio::strand>(
-                lib::ref(*io_service));
+            m_strand.reset(new boost::asio::strand(*io_service));
 
             m_async_read_handler = m_strand->wrap(lib::bind(
                 &type::handle_async_read, get_shared(),lib::placeholders::_1,
@@ -446,8 +442,8 @@ protected:
         if (ec) {
             // reset the handlers to break the circular reference:
             // this->handler->this
-            lib::clear_function(m_async_read_handler);
-            lib::clear_function(m_async_write_handler);
+            m_async_read_handler = async_read_handler();
+            m_async_write_handler = async_write_handler();
         }
 
         return ec;
@@ -506,16 +502,7 @@ protected:
         );
     }
 
-    /// Post init timeout callback
-    /**
-     * The timer pointer is included to ensure the timer isn't destroyed until
-     * after it has expired.
-     *
-     * @param post_timer Pointer to the timer in question
-     * @param callback The function to call back
-     * @param ec The status code
-     */
-    void handle_post_init_timeout(timer_ptr, init_handler callback,
+    void handle_post_init_timeout(timer_ptr post_timer, init_handler callback,
         lib::error_code const & ec)
     {
         lib::error_code ret_ec;
@@ -542,15 +529,6 @@ protected:
         callback(ret_ec);
     }
 
-    /// Post init timeout callback
-    /**
-     * The timer pointer is included to ensure the timer isn't destroyed until
-     * after it has expired.
-     *
-     * @param post_timer Pointer to the timer in question
-     * @param callback The function to call back
-     * @param ec The status code
-     */
     void handle_post_init(timer_ptr post_timer, init_handler callback,
         lib::error_code const & ec)
     {
@@ -569,7 +547,7 @@ protected:
             m_alog.write(log::alevel::devel,"asio connection handle_post_init");
         }
 
-        if (m_tcp_post_init_handler) {
+		if (m_tcp_post_init_handler) {
             m_tcp_post_init_handler(m_connection_hdl);
         }
 
@@ -715,14 +693,8 @@ protected:
         }
     }
 
-    /// Proxy read callback
-    /**
-     * @param init_handler The function to call back
-     * @param ec The status code
-     * @param bytes_transferred The number of bytes read
-     */
     void handle_proxy_read(init_handler callback,
-        boost::system::error_code const & ec, size_t)
+        boost::system::error_code const & ec, size_t bytes_transferred)
     {
         if (m_alog.static_test(log::alevel::devel)) {
             m_alog.write(log::alevel::devel,
@@ -841,8 +813,8 @@ protected:
             boost::asio::buffer(buf,len),
             boost::asio::transfer_at_least(num_bytes),
             make_custom_alloc_handler(
-                m_read_handler_allocator,
-                m_async_read_handler
+            	m_read_handler_allocator,
+            	m_async_read_handler
             )
         );
     }
@@ -873,7 +845,7 @@ protected:
         if (m_read_handler) {
             m_read_handler(tec,bytes_transferred);
             // TODO: why does this line break things?
-            //m_read_handler = _WEBSOCKETPP_NULL_FUNCTION_;
+            //m_read_handler = _WEBSOCKETPP_NULLPTR_TOKEN_;
         } else {
             // This can happen in cases where the connection is terminated while
             // the transport is waiting on a read.
@@ -890,7 +862,7 @@ protected:
             return;
         }
 
-        m_bufs.push_back(boost::asio::buffer(buf,len));
+		m_bufs.push_back(boost::asio::buffer(buf,len));
 
         m_write_handler = handler;
 
@@ -898,13 +870,13 @@ protected:
             socket_con_type::get_socket(),
             m_bufs,
             make_custom_alloc_handler(
-                m_write_handler_allocator,
-                m_async_write_handler
+            	m_write_handler_allocator,
+            	m_async_write_handler
             )
         );
     }
 
-    void async_write(std::vector<buffer> const & bufs, write_handler handler) {
+    void async_write(const std::vector<buffer>& bufs, write_handler handler) {
         if (!m_async_write_handler) {
             m_alog.write(log::alevel::devel,
                 "async_write (vector) called after async_shutdown");
@@ -923,18 +895,15 @@ protected:
             socket_con_type::get_socket(),
             m_bufs,
             make_custom_alloc_handler(
-                m_write_handler_allocator,
-                m_async_write_handler
+            	m_write_handler_allocator,
+            	m_async_write_handler
             )
         );
     }
 
-    /// Async write callback
-    /**
-     * @param ec The status code
-     * @param bytes_transferred The number of bytes read
-     */
-    void handle_async_write(boost::system::error_code const & ec, size_t) {
+    void handle_async_write(boost::system::error_code const & ec,
+        size_t bytes_transferred)
+    {
         m_bufs.clear();
         lib::error_code tec;
         if (ec) {
@@ -944,7 +913,7 @@ protected:
         if (m_write_handler) {
             m_write_handler(tec);
             // TODO: why does this line break things?
-            //m_write_handler = _WEBSOCKETPP_NULL_FUNCTION_;
+            //m_write_handler = _WEBSOCKETPP_NULLPTR_TOKEN_;
         } else {
             // This can happen in cases where the connection is terminated while
             // the transport is waiting on a read.
@@ -997,15 +966,15 @@ protected:
             m_alog.write(log::alevel::devel,"asio connection async_shutdown");
         }
 
-        // Reset cached handlers now that we won't be reading or writing anymore
-        // These cached handlers store shared pointers to this connection and
-        // will leak the connection if not destroyed.
-        lib::clear_function(m_async_read_handler);
-        lib::clear_function(m_async_write_handler);
-        lib::clear_function(m_init_handler);
+		// Reset cached handlers now that we won't be reading or writing anymore
+		// These cached handlers store shared pointers to this connection and
+		// will leak the connection if not destroyed.
+		m_async_read_handler = async_read_handler();
+		m_async_write_handler = async_write_handler();
+		m_init_handler = init_handler();
 
-        lib::clear_function(m_read_handler);
-        lib::clear_function(m_write_handler);
+        m_read_handler = read_handler();
+        m_write_handler = write_handler();
 
         timer_ptr shutdown_timer;
         shutdown_timer = set_timer(
@@ -1030,14 +999,8 @@ protected:
         );
     }
 
-    /// Async shutdown timeout handler
-    /**
-     * @param shutdown_timer A pointer to the timer to keep it in scope
-     * @param callback The function to call back
-     * @param ec The status code
-     */
-    void handle_async_shutdown_timeout(timer_ptr, init_handler callback, 
-        lib::error_code const & ec)
+    void handle_async_shutdown_timeout(timer_ptr shutdown_timer, init_handler
+        callback, lib::error_code const & ec)
     {
         lib::error_code ret_ec;
 

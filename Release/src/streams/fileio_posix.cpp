@@ -38,6 +38,86 @@ namespace Concurrency { namespace streams { namespace details {
 /***
 * ==++==
 *
+* Scheduler details.
+*
+* =-=-=-
+****/
+
+class io_scheduler;
+
+/// <summary>
+/// Scheduler of I/O completions as well as any asynchronous operations that
+/// are created internally as opposed to operations created by the application.
+/// </summary>
+class io_scheduler
+{
+public:
+    /// <summary>
+    /// Constructor
+    /// </summary>
+    io_scheduler()
+    : m_outstanding_work(0)
+    {
+        m_no_outstanding_work.set();
+    }
+
+    /// <summary>
+    /// Destructor
+    /// </summary>
+    ~io_scheduler()
+    {
+        m_no_outstanding_work.wait();
+    }
+
+    void submit_io()
+    {
+        m_no_outstanding_work.reset();
+        ++m_outstanding_work;
+    }
+
+    void complete_io()
+    {
+        if (--m_outstanding_work == 0)
+        {
+            m_no_outstanding_work.set();
+        }
+    }
+
+    io_service& service()
+    {
+        return crossplat::threadpool::shared_instance().service();
+    }
+
+private:
+    pplx::extensibility::event_t m_no_outstanding_work;
+
+    volatile std::atomic<long> m_outstanding_work;
+};
+
+/// <summary>
+/// We keep a single instance of the I/O scheduler. In order to create it on first
+/// demand, it's referenced through a shared_ptr<T> and retrieved through function call.
+/// </summary>
+boost::mutex _g_lock;
+std::shared_ptr<io_scheduler> _g_scheduler;
+
+/// <summary>
+/// Get the I/O scheduler instance.
+/// </summary>
+std::shared_ptr<io_scheduler> get_scheduler()
+{
+    boost::lock_guard<boost::mutex> lck(_g_lock);
+    if ( !_g_scheduler )
+    {
+        _g_scheduler = std::make_shared<io_scheduler>();
+    }
+
+    return _g_scheduler;
+}
+
+/***
+* ==++==
+*
 * Implementation details of the file stream buffer
 *
 * =-=-=-
@@ -50,11 +130,12 @@ namespace Concurrency { namespace streams { namespace details {
 /// </summary>
 struct _file_info_impl : _file_info
 {
-    _file_info_impl(int handle, std::ios_base::openmode mode, bool buffer_reads) :
+    _file_info_impl(std::shared_ptr<io_scheduler> sched, int handle, std::ios_base::openmode mode, bool buffer_reads) :
         _file_info(mode, 512),
         m_handle(handle),
         m_buffer_reads(buffer_reads),
-        m_outstanding_writes(0)
+        m_outstanding_writes(0),
+        m_scheduler(sched)
     {
     }
 
@@ -71,6 +152,13 @@ struct _file_info_impl : _file_info
     std::vector<_filestream_callback *> m_sync_waiters;
 
     std::atomic<long> m_outstanding_writes;
+
+    /// <summary>
+    /// A pointer to the scheduler instance used.
+    /// </summary>
+    /// <remarks>Even though we're using a singleton scheduler instance, it may not always be
+    /// the case, so it seems a good idea to keep a pointer here.</remarks>
+    std::shared_ptr<io_scheduler> m_scheduler;
 };
 
 }}}
@@ -84,8 +172,10 @@ struct _file_info_impl : _file_info
 /// <returns>The error code if there was an error in file creation.</returns>
 bool _finish_create(int fh, _filestream_callback *callback, std::ios_base::openmode mode, int /* prot */)
 {
-    if (fh != -1)
+    if ( fh != -1 )
     {
+        std::shared_ptr<io_scheduler> sched = get_scheduler();
+
         // Buffer reads internally if and only if we're just reading (not also writing) and
         // if the file is opened exclusively. If either is false, we're better off just
         // letting the OS do its buffering, even if it means that prompt reads won't
@@ -98,11 +188,11 @@ bool _finish_create(int fh, _filestream_callback *callback, std::ios_base::openm
             lseek(fh, 0, SEEK_END);
         }
 
-        auto info = new _file_info_impl(fh, mode, buffer);
+        auto info = new _file_info_impl(sched, fh, mode, buffer);
 
-        if (mode & std::ios_base::app || mode & std::ios_base::ate)
+        if ( mode & std::ios_base::app || mode & std::ios_base::ate )
         {
-            info->m_wrpos = static_cast<size_t>(-1); // Start at the end of the file.
+            info->m_wrpos = (size_t)-1; // Start at the end of the file.
         }
 
         callback->on_opened(info);
@@ -160,7 +250,8 @@ int get_open_flags(std::ios_base::openmode mode)
 /// </remarks>
 bool _open_fsb_str(_filestream_callback *callback, const char *filename, std::ios_base::openmode mode, int prot)
 {
-    if ( callback == nullptr || filename == nullptr) return false;
+    if ( callback == nullptr ) return false;
+    if ( filename == nullptr ) return false;
 
     std::string name(filename);
 
@@ -194,7 +285,7 @@ bool _close_fsb_nolock(_file_info **info, Concurrency::streams::details::_filest
     if ( callback == nullptr ) return false;
     if ( info == nullptr || *info == nullptr ) return false;
 
-    _file_info_impl *fInfo = static_cast<_file_info_impl *>(*info);
+    _file_info_impl *fInfo = (_file_info_impl *)*info;
 
     if ( fInfo->m_handle == -1 ) return false;
 
@@ -253,16 +344,20 @@ bool _close_fsb(_file_info **info, Concurrency::streams::details::_filestream_ca
 /// <param name="ptr">A pointer to the data to write</param>
 /// <param name="count">The size (in bytes) of the data</param>
 /// <returns>0 if the write request is still outstanding, -1 if the request failed, otherwise the size of the data written</returns>
-size_t _write_file_async(Concurrency::streams::details::_file_info_impl *fInfo, Concurrency::streams::details::_filestream_callback *callback, const void *ptr, size_t count, size_t position)
+size_t _write_file_async(Concurrency::streams::details::_file_info_impl *fInfo, Concurrency::streams::details::_filestream_callback *callback, const uint8_t *ptr, size_t count, size_t position)
 {
+    // async file writes are emulated using tasks
+    auto sched = get_scheduler();
+
     ++fInfo->m_outstanding_writes;
- 
+    sched->submit_io();
+
     pplx::create_task([=]() -> void
     {
         off_t abs_position;
         bool must_restore_pos;
         off_t orig_pos;
-        if( position == static_cast<size_t>(-1) )
+        if( position == (size_t)-1 )
         {
             orig_pos = lseek(fInfo->m_handle, 0, SEEK_CUR);
             abs_position = lseek(fInfo->m_handle, 0, SEEK_END);
@@ -303,6 +398,9 @@ size_t _write_file_async(Concurrency::streams::details::_file_info_impl *fInfo, 
                 fInfo->m_sync_waiters.clear();
             }
         }
+
+        delete[] ptr; // free buffer
+        sched->complete_io();
     });
 
     return 0;
@@ -319,6 +417,9 @@ size_t _write_file_async(Concurrency::streams::details::_file_info_impl *fInfo, 
 /// <returns>0 if the read request is still outstanding, -1 if the request failed, otherwise the size of the data read into the buffer</returns>
 size_t _read_file_async(Concurrency::streams::details::_file_info_impl *fInfo, Concurrency::streams::details::_filestream_callback *callback, void *ptr, size_t count, size_t offset)
 {
+    auto sched = get_scheduler();
+    sched->submit_io();
+
     pplx::create_task([=]() -> void
     {
         auto bytes_read = pread(fInfo->m_handle, ptr, count, offset);
@@ -330,6 +431,7 @@ size_t _read_file_async(Concurrency::streams::details::_file_info_impl *fInfo, C
         {
             callback->on_completed(bytes_read);
         }
+        sched->complete_io();
     });
 
     return 0;
@@ -339,7 +441,7 @@ template<typename Func>
 class _filestream_callback_fill_buffer : public _filestream_callback
 {
 public:
-    _filestream_callback_fill_buffer(_file_info *info, _filestream_callback *callback, const Func &func) : m_info(info), m_func(func), m_callback(callback) { }
+    _filestream_callback_fill_buffer(_file_info *info, _filestream_callback *callback, Func func) : m_info(info), m_func(func), m_callback(callback) { }
 
     virtual void on_completed(size_t result) override
     {
@@ -359,7 +461,7 @@ private:
 };
 
 template<typename Func>
-_filestream_callback_fill_buffer<Func> *create_callback(_file_info *info, _filestream_callback *callback, const Func &func)
+_filestream_callback_fill_buffer<Func> *create_callback(_file_info *info, _filestream_callback *callback, Func func)
 {
     return new _filestream_callback_fill_buffer<Func>(info, callback, func);
 }
@@ -372,7 +474,7 @@ size_t _fill_buffer_fsb(_file_info_impl *fInfo, _filestream_callback *callback, 
     if ( fInfo->m_buffer == nullptr )
     {
         fInfo->m_bufsize = std::max(PageSize, byteCount);
-        fInfo->m_buffer = new char[static_cast<size_t>(fInfo->m_bufsize)];
+        fInfo->m_buffer = new char[(size_t)fInfo->m_bufsize];
         fInfo->m_bufoff = fInfo->m_rdpos;
 
         auto cb = create_callback(fInfo, callback,
@@ -398,7 +500,7 @@ size_t _fill_buffer_fsb(_file_info_impl *fInfo, _filestream_callback *callback, 
 
         // Then, we allocate a new buffer.
 
-        char *newbuf = new char[static_cast<size_t>(fInfo->m_bufsize)];
+        char *newbuf = new char[(size_t)fInfo->m_bufsize];
 
         // Then, we copy the unread part to the new buffer and delete the old buffer
 
@@ -436,13 +538,14 @@ size_t _fill_buffer_fsb(_file_info_impl *fInfo, _filestream_callback *callback, 
 /// <returns>0 if the read request is still outstanding, -1 if the request failed, otherwise the size of the data read into the buffer</returns>
 size_t _getn_fsb(Concurrency::streams::details::_file_info *info, Concurrency::streams::details::_filestream_callback *callback, void *ptr, size_t count, size_t charSize)
 {
-    if ( callback == nullptr || info == nullptr ) return static_cast<size_t>(-1);
+    if ( callback == nullptr ) return (size_t)-1;
+    if ( info == nullptr ) return (size_t)-1;
 
     _file_info_impl *fInfo = (_file_info_impl *)info;
 
     pplx::extensibility::scoped_recursive_lock_t lock(info->m_lock);
 
-    if ( fInfo->m_handle == -1 ) return static_cast<size_t>(-1);
+    if ( fInfo->m_handle == -1 ) return (size_t)-1;
 
     size_t byteCount = count * charSize;
 
@@ -487,15 +590,18 @@ size_t _getn_fsb(Concurrency::streams::details::_file_info *info, Concurrency::s
 /// <returns>0 if the read request is still outstanding, -1 if the request failed, otherwise the size of the data read into the buffer</returns>
 size_t _putn_fsb(Concurrency::streams::details::_file_info *info, Concurrency::streams::details::_filestream_callback *callback, const void *ptr, size_t count, size_t charSize)
 {
-    if (callback == nullptr || info == nullptr) return static_cast<size_t>(-1);
+    if ( callback == nullptr ) return (size_t)-1;
+    if ( info == nullptr ) return (size_t)-1;
 
-    _file_info_impl *fInfo = static_cast<_file_info_impl *>(info);
+    _file_info_impl *fInfo = (_file_info_impl *)info;
 
     pplx::extensibility::scoped_recursive_lock_t lock(fInfo->m_lock);
 
-    if ( fInfo->m_handle == -1 ) return static_cast<size_t>(-1);
+    if ( fInfo->m_handle == -1 ) return (size_t)-1;
 
     size_t byteSize = count * charSize;
+    uint8_t *buf = new uint8_t[byteSize];
+    memcpy(buf, ptr, byteSize);
 
     // To preserve the async write order, we have to move the write head before read.
     auto lastPos = fInfo->m_wrpos;
@@ -505,7 +611,19 @@ size_t _putn_fsb(Concurrency::streams::details::_file_info *info, Concurrency::s
         lastPos *= charSize;
     }
 
-    return _write_file_async(fInfo, callback, ptr, byteSize, lastPos);
+    return _write_file_async(fInfo, callback, buf, byteSize, lastPos);
+}
+
+/// <summary>
+/// Write a single byte to the file stream.
+/// </summary>
+/// <param name="info">The file info record of the file</param>
+/// <param name="callback">A pointer to the callback interface to invoke when the write request is completed.</param>
+/// <param name="ptr">A pointer to a buffer where the data should be placed</param>
+/// <returns>0 if the read request is still outstanding, -1 if the request failed, otherwise the size of the data read into the buffer</returns>
+size_t _putc_fsb(Concurrency::streams::details::_file_info *info, Concurrency::streams::details::_filestream_callback *callback, int ch, size_t charSize)
+{
+    return _putn_fsb(info, callback, &ch, 1, charSize);
 }
 
 /// <summary>
@@ -519,7 +637,7 @@ bool _sync_fsb(Concurrency::streams::details::_file_info *info, Concurrency::str
     if ( callback == nullptr ) return false;
     if ( info == nullptr ) return false;
 
-    _file_info_impl *fInfo = static_cast<_file_info_impl *>(info);
+    _file_info_impl *fInfo = (_file_info_impl *)info;
 
     pplx::extensibility::scoped_recursive_lock_t lock(fInfo->m_lock);
 
@@ -541,13 +659,13 @@ bool _sync_fsb(Concurrency::streams::details::_file_info *info, Concurrency::str
 /// <returns>New file position or -1 if error</returns>
 size_t _seekrdtoend_fsb(Concurrency::streams::details::_file_info *info, int64_t offset, size_t char_size)
 {
-    if ( info == nullptr ) return static_cast<size_t>(-1);
+    if ( info == nullptr ) return (size_t)-1;
 
-    _file_info_impl *fInfo = static_cast<_file_info_impl *>(info);
+    _file_info_impl *fInfo = (_file_info_impl *)info;
 
     pplx::extensibility::scoped_recursive_lock_t lock(info->m_lock);
 
-    if ( fInfo->m_handle == -1 ) return static_cast<size_t>(-1);
+    if ( fInfo->m_handle == -1 ) return (size_t)-1;
 
     if ( fInfo->m_buffer != nullptr )
     {
@@ -558,7 +676,7 @@ size_t _seekrdtoend_fsb(Concurrency::streams::details::_file_info *info, int64_t
 
     auto newpos = lseek(fInfo->m_handle, static_cast<off_t>(offset * char_size), SEEK_END);
 
-    if ( newpos == -1 ) return static_cast<size_t>(-1);
+    if ( newpos == -1 ) return (size_t)-1;
 
     fInfo->m_rdpos = newpos / char_size;
     return fInfo->m_rdpos;
@@ -566,13 +684,13 @@ size_t _seekrdtoend_fsb(Concurrency::streams::details::_file_info *info, int64_t
 
 utility::size64_t _get_size(_In_ concurrency::streams::details::_file_info *info, size_t char_size)
 {
-    if ( info == nullptr ) return static_cast<size_t>(-1);
+    if ( info == nullptr ) return (size_t)-1;
 
-    _file_info_impl *fInfo = static_cast<_file_info_impl *>(info);
+    _file_info_impl *fInfo = (_file_info_impl *)info;
 
     pplx::extensibility::scoped_recursive_lock_t lock(info->m_lock);
 
-    if ( fInfo->m_handle == -1 ) return static_cast<size_t>(-1);
+    if ( fInfo->m_handle == -1 ) return (size_t)-1;
 
     if ( fInfo->m_buffer != nullptr )
     {
@@ -602,13 +720,13 @@ utility::size64_t _get_size(_In_ concurrency::streams::details::_file_info *info
 /// <returns>New file position or -1 if error</returns>
 size_t _seekrdpos_fsb(Concurrency::streams::details::_file_info *info, size_t pos, size_t)
 {
-    if ( info == nullptr ) return static_cast<size_t>(-1);
+    if ( info == nullptr ) return (size_t)-1;
 
-    _file_info_impl *fInfo = static_cast<_file_info_impl *>(info);
+    _file_info_impl *fInfo = (_file_info_impl *)info;
 
     pplx::extensibility::scoped_recursive_lock_t lock(info->m_lock);
 
-    if ( fInfo->m_handle == -1 ) return static_cast<size_t>(-1);
+    if ( fInfo->m_handle == -1 ) return (size_t)-1;
 
     if ( pos < fInfo->m_bufoff || pos > (fInfo->m_bufoff+fInfo->m_buffill) )
     {
@@ -629,13 +747,13 @@ size_t _seekrdpos_fsb(Concurrency::streams::details::_file_info *info, size_t po
 /// <returns>New file position or -1 if error</returns>
 size_t _seekwrpos_fsb(Concurrency::streams::details::_file_info *info, size_t pos, size_t)
 {
-    if ( info == nullptr ) return static_cast<size_t>(-1);
+    if ( info == nullptr ) return (size_t)-1;
 
-    _file_info_impl *fInfo = static_cast<_file_info_impl *>(info);
+    _file_info_impl *fInfo = (_file_info_impl *)info;
 
     pplx::extensibility::scoped_recursive_lock_t lock(info->m_lock);
 
-    if ( fInfo->m_handle == -1 ) return static_cast<size_t>(-1);
+    if ( fInfo->m_handle == -1 ) return (size_t)-1;
 
     fInfo->m_wrpos = pos;
     return fInfo->m_wrpos;

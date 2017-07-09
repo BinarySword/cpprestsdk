@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Peter Thorson. All rights reserved.
+ * Copyright (c) 2013, Peter Thorson. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -42,7 +42,7 @@ namespace net {
 
 inline bool is_little_endian() {
     short int val = 0x1;
-    char *ptr = reinterpret_cast<char *>(&val);
+    char *ptr = (char*)&val;
     return (ptr[0] == 1);
 }
 
@@ -50,18 +50,7 @@ inline bool is_little_endian() {
 #define TYP_SMLE 1
 #define TYP_BIGE 2
 
-/// Convert 64 bit value to network byte order
-/**
- * This method is prefixed to avoid conflicts with operating system level
- * macros for this functionality.
- *
- * TODO: figure out if it would be beneficial to use operating system level
- * macros for this.
- *
- * @param src The integer in host byte order
- * @return src converted to network byte order
- */
-inline uint64_t _htonll(uint64_t src) {
+inline uint64_t htonll(uint64_t src) {
     static int typ = TYP_INIT;
     unsigned char c;
     union {
@@ -82,19 +71,8 @@ inline uint64_t _htonll(uint64_t src) {
     return x.ull;
 }
 
-/// Convert 64 bit value to host byte order
-/**
- * This method is prefixed to avoid conflicts with operating system level
- * macros for this functionality.
- *
- * TODO: figure out if it would be beneficial to use operating system level
- * macros for this.
- *
- * @param src The integer in network byte order
- * @return src converted to host byte order
- */
-inline uint64_t _ntohll(uint64_t src) {
-    return _htonll(src);
+inline uint64_t ntohll(uint64_t src) {
+    return htonll(src);
 }
 
 } // net

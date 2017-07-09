@@ -8,11 +8,12 @@
     <SccAuxPath>SAK</SccAuxPath>
     <SccLocalPath>SAK</SccLocalPath>
     <SccProvider>SAK</SccProvider>
-    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <PlatformToolset>v140</PlatformToolset>
     <WinRTProject>false</WinRTProject>
     <TargetXP>false</TargetXP>
     <ProjectName>cpprestsdk140</ProjectName>
+    <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), build.root))\Build\Config.Definitions.props" />
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -20,44 +21,27 @@
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), build.root))\Build\Release.Product.Settings" />
   <ImportGroup Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
-    <Import Project="$(PackagesRoot)\boost.1.58.0.0\build\native\boost.targets" Condition="Exists('$(PackagesRoot)\boost.1.58.0.0\build\native\boost.targets')" />
-    <Import Project="$(PackagesRoot)\boost_system-vc140.1.58.0-vs140rc\build\native\boost_system-vc140.targets" Condition="Exists('$(PackagesRoot)\boost_system-vc140.1.58.0-vs140rc\build\native\boost_system-vc140.targets')" />
-    <Import Project="$(PackagesRoot)\zlib.v140.windesktop.msvcstl.static.rt-dyn.1.2.8.8\build\native\zlib.v140.windesktop.msvcstl.static.rt-dyn.targets" Condition="Exists('$(PackagesRoot)\zlib.v140.windesktop.msvcstl.static.rt-dyn.1.2.8.8\build\native\zlib.v140.windesktop.msvcstl.static.rt-dyn.targets')" />
-    <Import Project="$(PackagesRoot)\openssl.v140.windesktop.msvcstl.static.rt-dyn.x64.1.0.2.0\build\native\openssl.v140.windesktop.msvcstl.static.rt-dyn.x64.targets" Condition="Exists('$(PackagesRoot)\openssl.v140.windesktop.msvcstl.static.rt-dyn.x64.1.0.2.0\build\native\openssl.v140.windesktop.msvcstl.static.rt-dyn.x64.targets')" />
-    <Import Project="$(PackagesRoot)\openssl.v140.windesktop.msvcstl.static.rt-dyn.x86.1.0.2.0\build\native\openssl.v140.windesktop.msvcstl.static.rt-dyn.x86.targets" Condition="Exists('$(PackagesRoot)\openssl.v140.windesktop.msvcstl.static.rt-dyn.x86.1.0.2.0\build\native\openssl.v140.windesktop.msvcstl.static.rt-dyn.x86.targets')" />
-    <Import Project="$(PackagesRoot)\boost_date_time-vc140.1.58.0-vs140rc\build\native\boost_date_time-vc140.targets" Condition="Exists('$(PackagesRoot)\boost_date_time-vc140.1.58.0-vs140rc\build\native\boost_date_time-vc140.targets')" />
-    <Import Project="$(PackagesRoot)\boost_regex-vc140.1.58.0-vs140rc\build\native\boost_regex-vc140.targets" Condition="Exists('$(PackagesRoot)\boost_regex-vc140.1.58.0-vs140rc\build\native\boost_regex-vc140.targets')" />
+    <!--
+    <Import Project="$(PackagesRoot)\boost.1.55.0.16\build\native\boost.targets" Condition="Exists('$(PackagesRoot)\boost.1.55.0.16\build\native\boost.targets')" />
+    <Import Project="$(PackagesRoot)\boost_system-vc120.1.55.0.16\build\native\boost_system-vc120.targets" Condition="Exists('$(PackagesRoot)\boost_system-vc120.1.55.0.16\build\native\boost_system-vc120.targets')" />
+    <Import Project="$(PackagesRoot)\boost_date_time-vc120.1.55.0.16\build\native\boost_date_time-vc120.targets" Condition="Exists('$(PackagesRoot)\boost_date_time-vc120.1.55.0.16\build\native\boost_date_time-vc120.targets')" />
+    <Import Project="$(PackagesRoot)\boost_regex-vc120.1.55.0.16\build\native\boost_regex-vc120.targets" Condition="Exists('$(PackagesRoot)\boost_regex-vc120.1.55.0.16\build\native\boost_regex-vc120.targets')" />
+-->
   </ImportGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
     <DebugFileSuffix>d</DebugFileSuffix>
   </PropertyGroup>
   <PropertyGroup>
     <TargetName>$(CppRestBaseFileName)140$(DebugFileSuffix)_$(CppRestSDKVersionFileSuffix)</TargetName>
-    <NuGetPackageImportStamp>eec97f90</NuGetPackageImportStamp>
   </PropertyGroup>
-  <ItemGroup>
-    <None Include="packages.config">
-      <SubType>Designer</SubType>
-    </None>
-  </ItemGroup>
   <ItemDefinitionGroup>
     <ClCompile>
-      <PreprocessorDefinitions>_ASYNCRT_EXPORT;_PPLX_EXPORT;WIN32;_MBCS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>CPPREST_EXCLUDE_WEBSOCKETS;_ASYNCRT_EXPORT;_PPLX_EXPORT;WIN32;_MBCS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(CasablancaIncludeDir);$(CasablancaSrcDir)\pch;$(WebsocketppIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PrecompiledHeader>Use</PrecompiledHeader>
       <PrecompiledHeaderFile>stdafx.h</PrecompiledHeaderFile>
       <AdditionalOptions>-Zm300 /bigobj %(AdditionalOptions)</AdditionalOptions>
-      <RuntimeLibrary Condition="'$(Configuration)'=='Debug'">MultiThreadedDebugDLL</RuntimeLibrary>
-      <RuntimeLibrary Condition="'$(Configuration)'=='Release'">MultiThreadedDLL</RuntimeLibrary>
       <WholeProgramOptimization Condition="'$(Configuration)'=='Release'">true</WholeProgramOptimization>
-	  
-	  <!-- Disable warning about decorated name length exceeded, name was truncated. This is due to Boost.Asio and Websocket++ templates. -->
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4503;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4503;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">4503;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">4503;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4503;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4503;%(DisableSpecificWarnings)</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <AdditionalDependencies>Winhttp.lib;httpapi.lib;bcrypt.lib;crypt32.lib;%(AdditionalDependencies)</AdditionalDependencies>

@@ -9,7 +9,7 @@ set(ANDROID_STL_FLAGS)
 
 # Platform (not compiler) specific settings
 if(IOS)
-  set(IOS_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../Build_iOS")
+  set(IOS_SOURCE_DIR "${CMAKE_SOURCE_DIR}/../Build_iOS")
   set(Boost_FRAMEWORK "-F ${IOS_SOURCE_DIR} -framework boost")
   set(Boost_INCLUDE_DIR "${IOS_SOURCE_DIR}/boost.framework/Headers")
 
@@ -36,7 +36,7 @@ elseif(ANDROID)
     set(BOOST_ROOT "${CMAKE_BINARY_DIR}/../Boost-for-Android-x86/build")
     set(BOOST_LIBRARYDIR "${CMAKE_BINARY_DIR}/../Boost-for-Android-x86/build/lib")
   endif()
-  find_host_package(Boost 1.55 EXACT REQUIRED COMPONENTS random system thread filesystem chrono atomic)
+  find_host_package(Boost 1.55 EXACT REQUIRED COMPONENTS random system thread locale filesystem chrono atomic)
 
   set(OPENSSL_FOUND 1)
   if(ARM)
@@ -73,7 +73,7 @@ elseif(ANDROID)
   set(BUILD_SAMPLES OFF)
   option(BUILD_TESTS "Build tests." ON)
 elseif(UNIX) # This includes OSX
-  find_package(Boost REQUIRED COMPONENTS random chrono system thread regex filesystem)
+  find_package(Boost REQUIRED COMPONENTS random chrono system thread locale regex filesystem)
   find_package(Threads REQUIRED)
   if(APPLE AND NOT OPENSSL_ROOT_DIR)
     # Prefer a homebrew version of OpenSSL over the one in /usr/lib
@@ -114,7 +114,7 @@ elseif(WIN32)
   endif()
   add_definitions(${Casablanca_DEFINITIONS} -D_WINSOCK_DEPRECATED_NO_WARNINGS -DWIN32)
 
-  find_package(Boost 1.55 REQUIRED COMPONENTS random system thread filesystem chrono atomic)
+  find_package(Boost 1.55 REQUIRED COMPONENTS random system thread locale filesystem chrono atomic)
   find_package(OpenSSL 1.0 REQUIRED)
 else()
   message(FATAL_ERROR "-- Unsupported Build Platform.")
@@ -146,7 +146,9 @@ elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   message("-- Setting gcc options")
 
   set(WARNINGS "-Wall -Wextra -Wunused-parameter -Wcast-align -Wcast-qual -Wconversion -Wformat=2 -Winit-self -Winvalid-pch -Wmissing-format-attribute -Wmissing-include-dirs -Wpacked -Wredundant-decls -Wunreachable-code")
+  set(LINUX_SUPPRESSIONS "-Wno-deprecated -Wno-unknown-pragmas -Wno-reorder -Wno-unused-function -Wno-char-subscripts -Wno-switch -Wno-unused-but-set-parameter -Wno-unused-value -Wno-unused-local-typedefs")
 
+  set(WARNINGS "${WARNINGS} ${LINUX_SUPPRESSIONS}")
   set(LD_FLAGS "${LD_FLAGS} -Wl,-z,defs")
 
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -fno-strict-aliasing")

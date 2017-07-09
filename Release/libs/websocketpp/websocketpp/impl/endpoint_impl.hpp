@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Peter Thorson. All rights reserved.
+ * Copyright (c) 2013, Peter Thorson. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,8 +28,6 @@
 #ifndef WEBSOCKETPP_ENDPOINT_IMPL_HPP
 #define WEBSOCKETPP_ENDPOINT_IMPL_HPP
 
-#include <string>
-
 namespace websocketpp {
 
 template <typename connection, typename config>
@@ -44,8 +42,8 @@ endpoint<connection,config>::create_connection() {
 
     //scoped_lock_type guard(m_mutex);
     // Create a connection on the heap and manage it using a shared pointer
-    connection_ptr con = lib::make_shared<connection_type>(m_is_server,
-        m_user_agent, lib::ref(m_alog), lib::ref(m_elog), lib::ref(m_rng));
+    connection_ptr con(new connection_type(m_is_server,m_user_agent,m_alog,
+        m_elog, m_rng));
 
     connection_weak_ptr w(con);
 
@@ -79,7 +77,6 @@ endpoint<connection,config>::create_connection() {
     if (m_max_message_size != config::max_message_size) {
         con->set_max_message_size(m_max_message_size);
     }
-    con->set_max_http_body_size(m_max_http_body_size);
 
     lib::error_code ec;
 
@@ -107,7 +104,7 @@ template <typename connection, typename config>
 void endpoint<connection,config>::interrupt(connection_hdl hdl) {
     lib::error_code ec;
     interrupt(hdl,ec);
-    if (ec) { throw exception(ec); }
+    if (ec) { throw ec; }
 }
 
 template <typename connection, typename config>
@@ -123,7 +120,7 @@ template <typename connection, typename config>
 void endpoint<connection,config>::pause_reading(connection_hdl hdl) {
     lib::error_code ec;
     pause_reading(hdl,ec);
-    if (ec) { throw exception(ec); }
+    if (ec) { throw ec; }
 }
 
 template <typename connection, typename config>
@@ -139,7 +136,7 @@ template <typename connection, typename config>
 void endpoint<connection,config>::resume_reading(connection_hdl hdl) {
     lib::error_code ec;
     resume_reading(hdl,ec);
-    if (ec) { throw exception(ec); }
+    if (ec) { throw ec; }
 }
 
 
@@ -160,7 +157,7 @@ void endpoint<connection,config>::send(connection_hdl hdl, std::string const & p
 {
     lib::error_code ec;
     send(hdl,payload,op,ec);
-    if (ec) { throw exception(ec); }
+    if (ec) { throw ec; }
 }
 
 template <typename connection, typename config>
@@ -178,7 +175,7 @@ void endpoint<connection,config>::send(connection_hdl hdl, void const * payload,
 {
     lib::error_code ec;
     send(hdl,payload,len,op,ec);
-    if (ec) { throw exception(ec); }
+    if (ec) { throw ec; }
 }
 
 template <typename connection, typename config>
@@ -194,7 +191,7 @@ template <typename connection, typename config>
 void endpoint<connection,config>::send(connection_hdl hdl, message_ptr msg) {
     lib::error_code ec;
     send(hdl,msg,ec);
-    if (ec) { throw exception(ec); }
+    if (ec) { throw ec; }
 }
 
 template <typename connection, typename config>
@@ -213,7 +210,7 @@ void endpoint<connection,config>::close(connection_hdl hdl, close::status::value
 {
     lib::error_code ec;
     close(hdl,code,reason,ec);
-    if (ec) { throw exception(ec); }
+    if (ec) { throw ec; }
 }
 
 template <typename connection, typename config>
@@ -230,7 +227,7 @@ void endpoint<connection,config>::ping(connection_hdl hdl, std::string const & p
 {
     lib::error_code ec;
     ping(hdl,payload,ec);
-    if (ec) { throw exception(ec); }
+    if (ec) { throw ec; }
 }
 
 template <typename connection, typename config>
@@ -247,7 +244,7 @@ void endpoint<connection,config>::pong(connection_hdl hdl, std::string const & p
 {
     lib::error_code ec;
     pong(hdl,payload,ec);
-    if (ec) { throw exception(ec); }
+    if (ec) { throw ec; }
 }
 
 } // namespace websocketpp

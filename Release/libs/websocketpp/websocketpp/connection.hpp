@@ -29,18 +29,18 @@
 #define WEBSOCKETPP_CONNECTION_HPP
 
 #include <websocketpp/close.hpp>
-#include <websocketpp/error.hpp>
-#include <websocketpp/frame.hpp>
-
-#include <websocketpp/logger/levels.hpp>
-#include <websocketpp/processors/processor.hpp>
-#include <websocketpp/transport/base/connection.hpp>
-#include <websocketpp/http/constants.hpp>
-
 #include <websocketpp/common/connection_hdl.hpp>
 #include <websocketpp/common/cpp11.hpp>
 #include <websocketpp/common/functional.hpp>
+#include <websocketpp/error.hpp>
+#include <websocketpp/frame.hpp>
+#include <websocketpp/http/constants.hpp>
+#include <websocketpp/logger/levels.hpp>
+#include <websocketpp/processors/processor.hpp>
+#include <websocketpp/transport/base/connection.hpp>
 
+#include <algorithm>
+#include <iostream>
 #include <queue>
 #include <sstream>
 #include <string>
@@ -119,7 +119,7 @@ typedef lib::function<void(connection_hdl,std::string)> pong_timeout_handler;
 /**
  * The validate handler is called after a WebSocket handshake has been received
  * and processed but before it has been accepted. This gives the application a
- * chance to implement connection details specific policies for accepting
+ * chance to impliment connection details specific policies for accepting
  * connections and the ability to negotiate extensions and subprotocols.
  *
  * The validate handler return value indicates whether or not the connection
@@ -311,7 +311,6 @@ public:
       , m_rng(rng)
       , m_local_close_code(close::status::abnormal_close)
       , m_remote_close_code(close::status::abnormal_close)
-      , m_is_http(false)
       , m_was_clean(false)
     {
         m_alog.write(log::alevel::devel,"connection constructor");
@@ -534,8 +533,8 @@ public:
 
     /// Get maximum message size
     /**
-     * Get maximum message size. Maximum message size determines the point at 
-     * which the connection will fail with the message_too_big protocol error.
+     * Get maximum message size. Maximum message size determines the point at which the
+     * connection will fail a connection with the message_too_big protocol error.
      *
      * The default is set by the endpoint that creates the connection.
      *
@@ -547,9 +546,9 @@ public:
     
     /// Set maximum message size
     /**
-     * Set maximum message size. Maximum message size determines the point at 
-     * which the connection will fail with the message_too_big protocol error. 
-     * This value may be changed during the connection.
+     * Set maximum message size. Maximum message size determines the point at which the
+     * connection will fail a connection with the message_too_big protocol error. This
+     * value may be changed during the connection.
      *
      * The default is set by the endpoint that creates the connection.
      *
@@ -562,38 +561,6 @@ public:
         if (m_processor) {
             m_processor->set_max_message_size(new_value);
         }
-    }
-    
-    /// Get maximum HTTP message body size
-    /**
-     * Get maximum HTTP message body size. Maximum message body size determines
-     * the point at which the connection will stop reading an HTTP request whose
-     * body is too large.
-     *
-     * The default is set by the endpoint that creates the connection.
-     *
-     * @since 0.5.0
-     *
-     * @return The maximum HTTP message body size
-     */
-    size_t get_max_http_body_size() const {
-        return m_request.get_max_body_size();
-    }
-    
-    /// Set maximum HTTP message body size
-    /**
-     * Set maximum HTTP message body size. Maximum message body size determines
-     * the point at which the connection will stop reading an HTTP request whose
-     * body is too large.
-     *
-     * The default is set by the endpoint that creates the connection.
-     *
-     * @since 0.5.0
-     *
-     * @param new_value The value to set as the maximum message size.
-     */
-    void set_max_http_body_size(size_t new_value) {
-        m_request.set_max_body_size(new_value);
     }
 
     //////////////////////////////////
@@ -932,18 +899,7 @@ public:
      * @param key Name of the header to get
      * @return The value of the header
      */
-    std::string const & get_request_header(std::string const & key) const;
-
-    /// Retrieve a request body
-    /**
-     * Retrieve the value of the request body. This value is typically used with
-     * PUT and POST requests to upload files or other data. Only HTTP
-     * connections will ever have bodies. WebSocket connection's will always
-     * have blank bodies.
-     *
-     * @return The value of the request body.
-     */
-    std::string const & get_request_body() const;
+    std::string const & get_request_header(std::string const & key);
 
     /// Retrieve a response header
     /**
@@ -952,7 +908,7 @@ public:
      * @param key Name of the header to get
      * @return The value of the header
      */
-    std::string const & get_response_header(std::string const & key) const;
+    std::string const & get_response_header(std::string const & key);
 
     /// Set response status code and message
     /**
@@ -1212,7 +1168,7 @@ public:
     void read_frame();
 
     /// Get array of WebSocket protocol versions that this connection supports.
-    std::vector<int> const & get_supported_versions() const;
+    const std::vector<int>& get_supported_versions() const;
 
     /// Sets the handler for a terminating connection. Should only be used
     /// internally by the endpoint class.
@@ -1246,21 +1202,60 @@ protected:
     void handle_transport_init(lib::error_code const & ec);
 
     /// Set m_processor based on information in m_request. Set m_response
-    /// status and return an error code indicating status.
-    lib::error_code initialize_processor();
+    /// status and return false on error.
+    bool initialize_processor();
 
     /// Perform WebSocket handshake validation of m_request using m_processor.
-    /// set m_response and return an error code indicating status.
-    lib::error_code process_handshake_request();
+    /// set m_response and return false on error.
+    bool process_handshake_request();
+
+    /// Atomically change the internal connection state.
+    /**
+     * @param req The required starting state. If the internal state does not
+     * match req an exception is thrown.
+     *
+     * @param dest The state to change to.
+     *
+     * @param msg The message to include in the exception thrown
+     */
+    void atomic_state_change(istate_type req, istate_type dest,
+        std::string msg);
+
+    /// Atomically change the internal and external connection state.
+    /**
+     * @param ireq The required starting internal state. If the internal state
+     * does not match ireq an exception is thrown.
+     *
+     * @param idest The internal state to change to.
+     *
+     * @param ereq The required starting external state. If the external state
+     * does not match ereq an exception is thrown.
+     *
+     * @param edest The external state to change to.
+     *
+     * @param msg The message to include in the exception thrown
+     */
+    void atomic_state_change(istate_type ireq, istate_type idest,
+        session::state::value ereq, session::state::value edest,
+        std::string msg);
+
+    /// Atomically read and compared the internal state.
+    /**
+     * @param req The state to test against. If the internal state does not
+     * match req an exception is thrown.
+     *
+     * @param msg The message to include in the exception thrown
+     */
+    void atomic_state_check(istate_type req, std::string msg);
 private:
     /// Completes m_response, serializes it, and sends it out on the wire.
-    void send_http_response(lib::error_code const & ec);
+    void send_http_response();
 
     /// Sends an opening WebSocket connect request
     void send_http_request();
 
     /// Alternate path for send_http_response in error conditions
-    void send_http_response_error(lib::error_code const & ec);
+    void send_http_response_error();
 
     /// Process control message
     /**
@@ -1357,12 +1352,6 @@ private:
      * Includes: error code and message for why it was failed
      */
     void log_fail_result();
-    
-    /// Prints information about HTTP connections
-    /**
-     * Includes: TODO
-     */
-    void log_http_result();
 
     /// Prints information about an arbitrary error code on the specified channel
     template <typename error_type>
@@ -1506,10 +1495,6 @@ private:
 
     /// Detailed internal error code
     lib::error_code m_ec;
-    
-    /// A flag that gets set once it is determined that the connection is an
-    /// HTTP connection and not a WebSocket one.
-    bool m_is_http;
 
     bool m_was_clean;
 

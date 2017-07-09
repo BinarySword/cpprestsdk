@@ -2,6 +2,15 @@
 
   <Import Project="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildThisFileDirectory), build.root))\Build\Common.Build.settings" />
 
+  <ItemGroup Condition="'$(DevToolsVersion)'=='110'">
+      <ProjectFile Include="VS11\Uri110_test.vcxproj" />
+      <ProjectFile Include="VS11.xp\Uri110_test.xp.vcxproj" Condition="'$(Platform)'!='ARM' and '$(RunCodeAnalysis)'!='true'"/>
+  </ItemGroup>
+  
+  <ItemGroup Condition="'$(OsVersion)|$(DevToolsVersion)'=='6.2|110' or '$(OsVersion)|$(DevToolsVersion)'=='6.3|110'">
+      <ProjectFile Include="VS11.winrt\URI110_test.winrt.vcxproj" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(DevToolsVersion)'=='120'">
       <ProjectFile Include="VS12\Uri120_test.vcxproj" />
       <ProjectFile Include="VS12.xp\Uri120_test.xp.vcxproj" Condition="'$(Platform)'!='ARM' and '$(RunCodeAnalysis)'!='true'"/>
@@ -16,10 +25,6 @@
     <ProjectFile Include="vs14.android\Uri140_test.android.vcxproj" Condition="'$(Platform)'!='x64'" />
   </ItemGroup>
 
-  <ItemGroup Condition="'$(OsVersion)|$(DevToolsVersion)'=='6.3|140'">
-    <ProjectFile Include="vs14.uwp\URI140_test.uwp.vcxproj" />
-  </ItemGroup>
-  
   <Import Project="$(TargetsPath)\Common.Build.Traversal.targets" />
 
 </Project>

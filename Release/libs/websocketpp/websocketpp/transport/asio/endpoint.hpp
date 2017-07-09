@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Peter Thorson. All rights reserved.
+ * Copyright (c) 2013, Peter Thorson. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,21 +28,17 @@
 #ifndef WEBSOCKETPP_TRANSPORT_ASIO_HPP
 #define WEBSOCKETPP_TRANSPORT_ASIO_HPP
 
+#include <websocketpp/common/functional.hpp>
+#include <websocketpp/logger/levels.hpp>
 #include <websocketpp/transport/base/endpoint.hpp>
 #include <websocketpp/transport/asio/connection.hpp>
 #include <websocketpp/transport/asio/security/none.hpp>
-
-#include <websocketpp/uri.hpp>
-#include <websocketpp/logger/levels.hpp>
-
-#include <websocketpp/common/functional.hpp>
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <boost/system/error_code.hpp>
 
-#include <sstream>
-#include <string>
+#include <iostream>
 
 namespace websocketpp {
 namespace transport {
@@ -93,8 +89,7 @@ public:
 
     // generate and manage our own io_service
     explicit endpoint()
-      : m_io_service(NULL)
-      , m_external_io_service(false)
+      : m_external_io_service(false)
       , m_listen_backlog(0)
       , m_reuse_addr(false)
       , m_state(UNINITIALIZED)
@@ -183,9 +178,7 @@ public:
 
         m_io_service = ptr;
         m_external_io_service = true;
-        m_acceptor = lib::make_shared<boost::asio::ip::tcp::acceptor>(
-            lib::ref(*m_io_service));
-
+        m_acceptor.reset(new boost::asio::ip::tcp::acceptor(*m_io_service));
         m_state = READY;
         ec = lib::error_code();
     }
@@ -201,7 +194,9 @@ public:
     void init_asio(io_service_ptr ptr) {
         lib::error_code ec;
         init_asio(ptr,ec);
-        if (ec) { throw exception(ec); }
+        if (ec) {
+            throw ec;
+        }
     }
 
     /// Initialize asio transport with internal io_service (exception free)
@@ -214,7 +209,7 @@ public:
      * @param ec Set to indicate what error occurred, if any.
      */
     void init_asio(lib::error_code & ec) {
-        init_asio(new boost::asio::io_service(), ec);
+        init_asio(new boost::asio::io_service(),ec);
         m_external_io_service = false;
     }
 
@@ -295,12 +290,12 @@ public:
     void set_listen_backlog(int backlog) {
         m_listen_backlog = backlog;
     }
-
-    /// Sets whether to use the SO_REUSEADDR flag when opening listening sockets
+    
+    /// Sets whether or not to use the SO_REUSEADDR flag when opening a listening socket
     /**
-     * Specifies whether or not to use the SO_REUSEADDR TCP socket option. What
-     * this flag does depends on your operating system. Please consult operating
-     * system documentation for more details.
+     * Specifies whether or not to use the SO_REUSEADDR TCP socket option. What this flag
+     * does depends on your operating system. Please consult operating system
+     * documentation for more details.
      *
      * New values affect future calls to listen only.
      *
@@ -362,9 +357,6 @@ public:
             m_acceptor->listen(m_listen_backlog,bec);
         }
         if (bec) {
-            if (m_acceptor->is_open()) {
-                m_acceptor->close();
-            }
             log_err(log::elevel::info,"asio listen",bec);
             ec = make_error_code(error::pass_through);
         } else {
@@ -382,7 +374,9 @@ public:
     void listen(boost::asio::ip::tcp::endpoint const & ep) {
         lib::error_code ec;
         listen(ep,ec);
-        if (ec) { throw exception(ec); }
+        if (ec) {
+            throw ec;
+        }
     }
 
     /// Set up endpoint for listening with protocol and port (exception free)
@@ -512,7 +506,9 @@ public:
     {
         lib::error_code ec;
         listen(host,service,ec);
-        if (ec) { throw exception(ec); }
+        if (ec) {
+            throw ec;
+        }
     }
 
     /// Stop listening (exception free)
@@ -547,7 +543,9 @@ public:
     void stop_listening() {
         lib::error_code ec;
         stop_listening(ec);
-        if (ec) { throw exception(ec); }
+        if (ec) {
+            throw ec;
+        }
     }
 
     /// Check if the endpoint is listening
@@ -609,9 +607,7 @@ public:
      * @since 0.3.0
      */
     void start_perpetual() {
-        m_work = lib::make_shared<boost::asio::io_service::work>(
-            lib::ref(*m_io_service)
-        );
+        m_work.reset(new boost::asio::io_service::work(*m_io_service));
     }
 
     /// Clears the endpoint's perpetual flag, allowing it to exit when empty
@@ -639,9 +635,11 @@ public:
      * needed.
      */
     timer_ptr set_timer(long duration, timer_handler callback) {
-        timer_ptr new_timer = lib::make_shared<boost::asio::deadline_timer>(
-            *m_io_service,
-            boost::posix_time::milliseconds(duration)
+        timer_ptr new_timer(
+            new boost::asio::deadline_timer(
+                *m_io_service,
+                boost::posix_time::milliseconds(duration)
+            )
         );
 
         new_timer->async_wait(
@@ -657,7 +655,7 @@ public:
         return new_timer;
     }
 
-    /// Timer handler
+    /// Timer callback
     /**
      * The timer pointer is included to ensure the timer isn't destroyed until
      * after it has expired.
@@ -666,7 +664,7 @@ public:
      * @param callback The function to call back
      * @param ec A status code indicating an error, if any.
      */
-    void handle_timer(timer_ptr, timer_handler callback,
+    void handle_timer(timer_ptr t, timer_handler callback,
         boost::system::error_code const & ec)
     {
         if (ec) {
@@ -731,7 +729,9 @@ public:
     void async_accept(transport_con_ptr tcon, accept_handler callback) {
         lib::error_code ec;
         async_accept(tcon,callback,ec);
-        if (ec) { throw exception(ec); }
+        if (ec) {
+            throw ec;
+        }
     }
 protected:
     /// Initialize logging
@@ -775,8 +775,7 @@ protected:
 
         // Create a resolver
         if (!m_resolver) {
-            m_resolver = lib::make_shared<boost::asio::ip::tcp::resolver>(
-                lib::ref(*m_io_service));
+            m_resolver.reset(new boost::asio::ip::tcp::resolver(*m_io_service));
         }
 
         std::string proxy = tcon->get_proxy();
@@ -789,7 +788,7 @@ protected:
         } else {
             lib::error_code ec;
 
-            uri_ptr pu = lib::make_shared<uri>(proxy);
+            uri_ptr pu(new uri(proxy));
 
             if (!pu->get_valid()) {
                 cb(make_error_code(error::proxy_invalid));
@@ -855,16 +854,7 @@ protected:
         }
     }
 
-    /// DNS resolution timeout handler
-    /**
-     * The timer pointer is included to ensure the timer isn't destroyed until
-     * after it has expired.
-     *
-     * @param dns_timer Pointer to the timer in question
-     * @param callback The function to call back
-     * @param ec A status code indicating an error, if any.
-     */
-    void handle_resolve_timeout(timer_ptr, connect_handler callback,
+    void handle_resolve_timeout(timer_ptr dns_timer, connect_handler callback,
         lib::error_code const & ec)
     {
         lib::error_code ret_ec;
@@ -963,17 +953,7 @@ protected:
         }
     }
 
-    /// Asio connect timeout handler
-    /**
-     * The timer pointer is included to ensure the timer isn't destroyed until
-     * after it has expired.
-     *
-     * @param tcon Pointer to the transport connection that is being connected
-     * @param con_timer Pointer to the timer in question
-     * @param callback The function to call back
-     * @param ec A status code indicating an error, if any.
-     */
-    void handle_connect_timeout(transport_con_ptr tcon, timer_ptr,
+    void handle_connect_timeout(transport_con_ptr tcon, timer_ptr con_timer,
         connect_handler callback, lib::error_code const & ec)
     {
         lib::error_code ret_ec;

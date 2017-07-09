@@ -1997,16 +1997,9 @@ namespace details
             }
             catch(...)
             {
-                // The exception could have come from two places:
-                //   1. From the chore body, so it already should have been caught and canceled.
-                //      In this case swallow the exception.
-                //   2. From trying to actually schedule the task on the scheduler.
-                //      In this case cancel the task with the current exception, otherwise the
-                //      task will never be signaled leading to deadlock when waiting on the task.
-                if (!_HasUserException())
-                {
-                    _CancelWithException(std::current_exception());
-                }
+                // This exception could only have come from within the chore body. It should've been caught
+                // and the task should be canceled with exception. Swallow the exception here.
+                _ASSERTE(_HasUserException());
             }
         }
 
@@ -6395,6 +6388,8 @@ namespace details
 
                     _PTask->_Then([_PParam, _Index](task<_ElementType> _ResultTask) {
 
+                        //  Dev10 compiler bug
+                        typedef _ElementType _ElementTypeDev10;
                         auto _PParamCopy = _PParam;
                         auto _IndexCopy = _Index;
                         auto _Func = [_PParamCopy, _IndexCopy, &_ResultTask](){
@@ -6472,7 +6467,8 @@ namespace details
                     }
 
                     _PTask->_Then([_PParam, _Index](task<std::vector<_ElementType>> _ResultTask) {
-
+                        //  Dev10 compiler bug
+                        typedef _ElementType _ElementTypeDev10;
                         auto _PParamCopy = _PParam;
                         auto _IndexCopy = _Index;
                         auto _Func = [_PParamCopy, _IndexCopy, &_ResultTask]() {
@@ -6589,6 +6585,8 @@ namespace details
             _ReturnTask._SetAsync();
         }
         _VectorTask._Then([_PParam](task<std::vector<_ReturnType>> _ResultTask) {
+            //  Dev10 compiler bug
+            typedef _ReturnType _ReturnTypeDev10;
             auto _PParamCopy = _PParam;
             auto _Func = [_PParamCopy, &_ResultTask]() {
                 auto _ResultLocal = _ResultTask._GetImpl()->_GetResult();
@@ -6598,6 +6596,8 @@ namespace details
             _WhenAllContinuationWrapper(_PParam, _Func, _ResultTask);
         }, _CancellationTokenState::_None());
         _ValueTask._Then([_PParam](task<_ReturnType> _ResultTask) {
+            //  Dev10 compiler bug
+            typedef _ReturnType _ReturnTypeDev10;
             auto _PParamCopy = _PParam;
             auto _Func = [_PParamCopy, &_ResultTask]() {
                 auto _ResultLocal = _ResultTask._GetImpl()->_GetResult();
@@ -7178,11 +7178,13 @@ task<std::vector<_ReturnType>> operator||(const task<std::vector<_ReturnType>> &
     
     _Rhs._Then([_PParam](task<_ReturnType> _ResultTask) 
     {
+        //  Dev10 compiler bug
+        typedef _ReturnType _ReturnTypeDev10;
         auto _PParamCopy = _PParam;
         auto _Func = [&_ResultTask, _PParamCopy]() {
             auto _Result = _ResultTask._GetImpl()->_GetResult();
 
-            std::vector<_ReturnType> _Vec;
+            std::vector<_ReturnTypeDev10> _Vec;
             _Vec.push_back(_Result);
             _PParamCopy->_M_Completed.set(std::make_pair(_Vec, _ResultTask._GetImpl()->_M_pTokenState));
         };

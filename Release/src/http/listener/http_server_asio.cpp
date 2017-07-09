@@ -291,10 +291,17 @@ void connection::handle_http_line(const boost::system::error_code& ec)
             return;
         }
 
+        // Get the host part of the address.
+        uri_builder builder;
+        builder.set_scheme("http");
+        builder.set_host(m_p_parent->m_host, true);
+        builder.set_port(m_p_parent->m_port);
+
         // Get the path - remove the version portion and prefix space
+        builder.append_path(http_path_and_version.substr(1, http_path_and_version.size() - VersionPortionSize - 1));
         try
         {
-            m_request.set_request_uri(http_path_and_version.substr(1, http_path_and_version.size() - VersionPortionSize - 1));
+            m_request.set_request_uri(builder.to_uri());
         }
         catch(const uri_exception &e)
         {
@@ -421,7 +428,7 @@ void connection::handle_chunked_body(const boost::system::error_code& ec, int to
     else
     {
         auto writebuf = m_request._get_impl()->outstream().streambuf();
-        writebuf.putn_nocopy(buffer_cast<const uint8_t *>(m_request_buf.data()), toWrite).then([=](pplx::task<size_t> writeChunkTask)
+        writebuf.putn(buffer_cast<const uint8_t *>(m_request_buf.data()), toWrite).then([=](pplx::task<size_t> writeChunkTask)
         {
             try
             {
@@ -450,7 +457,7 @@ void connection::handle_body(const boost::system::error_code& ec)
     else if (m_read < m_read_size)  // there is more to read
     {
         auto writebuf = m_request._get_impl()->outstream().streambuf();
-        writebuf.putn_nocopy(boost::asio::buffer_cast<const uint8_t*>(m_request_buf.data()), std::min(m_request_buf.size(), m_read_size - m_read)).then([=](pplx::task<size_t> writtenSizeTask)
+        writebuf.putn(boost::asio::buffer_cast<const uint8_t*>(m_request_buf.data()), std::min(m_request_buf.size(), m_read_size - m_read)).then([=](pplx::task<size_t> writtenSizeTask)
         {
             size_t writtenSize = 0;
             try
@@ -846,37 +853,21 @@ pplx::task<void> http_linux_server::register_listener(details::http_listener_imp
     {
         pplx::extensibility::scoped_rw_lock_t lock(m_listeners_lock);
         if (m_registered_listeners.find(listener) != m_registered_listeners.end())
-        {
             throw std::invalid_argument("listener already registered");
-        }
 
-        try
+        m_registered_listeners[listener] = utility::details::make_unique<pplx::extensibility::reader_writer_lock_t>();
+
+        auto found_hostport_listener = m_listeners.find(hostport);
+        if (found_hostport_listener == m_listeners.end())
         {
-            m_registered_listeners[listener] = utility::details::make_unique<pplx::extensibility::reader_writer_lock_t>();
+            found_hostport_listener = m_listeners.insert(
+                std::make_pair(hostport, utility::details::make_unique<details::hostport_listener>(this, hostport))).first;
 
-            auto found_hostport_listener = m_listeners.find(hostport);
-            if (found_hostport_listener == m_listeners.end())
-            {
-                found_hostport_listener = m_listeners.insert(
-                    std::make_pair(hostport, utility::details::make_unique<details::hostport_listener>(this, hostport))).first;
-
-                if (m_started)
-                {
-                    found_hostport_listener->second->start();
-                }
-            }
-
-            found_hostport_listener->second->add_listener(path, listener);
+            if (m_started)
+                found_hostport_listener->second->start();
         }
-        catch (...)
-        {
-            // Future improvement - really this API should entirely be asychronously.
-            // the hostport_listener::start() method should be made to return a task
-            // throwing the exception.
-            m_registered_listeners.erase(listener);
-            m_listeners.erase(hostport);
-            throw;
-        }
+
+        found_hostport_listener->second->add_listener(path, listener);
     }
 
     return pplx::task_from_result();

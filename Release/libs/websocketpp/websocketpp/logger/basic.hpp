@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Peter Thorson. All rights reserved.
+ * Copyright (c) 2013, Peter Thorson. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -40,16 +40,13 @@
  *
  */
 
-#include <websocketpp/logger/levels.hpp>
-
-#include <websocketpp/common/cpp11.hpp>
-#include <websocketpp/common/stdint.hpp>
-#include <websocketpp/common/time.hpp>
-
 #include <ctime>
 #include <iostream>
 #include <iomanip>
-#include <string>
+
+#include <websocketpp/common/cpp11.hpp>
+#include <websocketpp/common/stdint.hpp>
+#include <websocketpp/logger/levels.hpp>
 
 namespace websocketpp {
 namespace log {
@@ -58,24 +55,12 @@ namespace log {
 template <typename concurrency, typename names>
 class basic {
 public:
-    basic<concurrency,names>(channel_type_hint::value h =
-        channel_type_hint::access)
-      : m_static_channels(0xffffffff)
-      , m_dynamic_channels(0)
-      , m_out(h == channel_type_hint::error ? &std::cerr : &std::cout) {}
-
-    basic<concurrency,names>(std::ostream * out)
+    basic<concurrency,names>(std::ostream * out = &std::cout)
       : m_static_channels(0xffffffff)
       , m_dynamic_channels(0)
       , m_out(out) {}
 
-    basic<concurrency,names>(level c, channel_type_hint::value h =
-        channel_type_hint::access)
-      : m_static_channels(c)
-      , m_dynamic_channels(0)
-      , m_out(h == channel_type_hint::error ? &std::cerr : &std::cout) {}
-
-    basic<concurrency,names>(level c, std::ostream * out)
+    basic<concurrency,names>(level c, std::ostream * out = &std::cout)
       : m_static_channels(c)
       , m_dynamic_channels(0)
       , m_out(out) {}
@@ -99,11 +84,6 @@ public:
         m_dynamic_channels &= ~channels;
     }
 
-    /// Write a string message to the given channel
-    /**
-     * @param channel The channel to write to
-     * @param msg The message to write
-     */
     void write(level channel, std::string const & msg) {
         scoped_lock_type lock(m_lock);
         if (!this->dynamic_test(channel)) { return; }
@@ -113,11 +93,6 @@ public:
         m_out->flush();
     }
 
-    /// Write a cstring message to the given channel
-    /**
-     * @param channel The channel to write to
-     * @param msg The message to write
-     */
     void write(level channel, char const * msg) {
         scoped_lock_type lock(m_lock);
         if (!this->dynamic_test(channel)) { return; }
@@ -134,13 +109,10 @@ public:
     bool dynamic_test(level channel) {
         return ((channel & m_dynamic_channels) != 0);
     }
-
-protected:
+private:
     typedef typename concurrency::scoped_lock_type scoped_lock_type;
     typedef typename concurrency::mutex_type mutex_type;
-    mutex_type m_lock;
 
-private:
     // The timestamp does not include the time zone, because on Windows with the
     // default registry settings, the time zone would be written out in full,
     // which would be obnoxiously verbose.
@@ -148,15 +120,17 @@ private:
     // TODO: find a workaround for this or make this format user settable
     static std::ostream & timestamp(std::ostream & os) {
         std::time_t t = std::time(NULL);
-        std::tm lt = lib::localtime(t);
-        #ifdef _WEBSOCKETPP_PUTTIME_
-            return os << std::put_time(&lt,"%Y-%m-%d %H:%M:%S");
+        std::tm* lt = std::localtime(&t);
+        #ifdef _WEBSOCKETPP_CPP11_CHRONO_
+            return os << std::put_time(lt,"%Y-%m-%d %H:%M:%S");
         #else // Falls back to strftime, which requires a temporary copy of the string.
             char buffer[20];
-            size_t result = std::strftime(buffer,sizeof(buffer),"%Y-%m-%d %H:%M:%S",&lt);
-            return os << (result == 0 ? "Unknown" : buffer);
+            std::strftime(buffer,sizeof(buffer),"%Y-%m-%d %H:%M:%S",lt);
+            return os << buffer;
         #endif
     }
+
+    mutex_type m_lock;
 
     level const m_static_channels;
     level m_dynamic_channels;

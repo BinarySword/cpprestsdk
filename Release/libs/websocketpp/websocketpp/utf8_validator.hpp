@@ -31,8 +31,6 @@
 
 #include <websocketpp/common/stdint.hpp>
 
-#include <string>
-
 namespace websocketpp {
 namespace utf8_validator {
 

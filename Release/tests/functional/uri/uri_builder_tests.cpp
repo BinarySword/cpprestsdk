@@ -458,22 +458,13 @@ TEST(to_string_invalid_uri)
 
 TEST(append_query_locale, "Ignore:Android", "Locale unsupported on Android")
 {
-    std::locale changedLocale;
-    try
-    {
 #ifdef _WIN32
-        changedLocale = std::locale("fr-FR");
+    std::string changedLocale("fr-FR");
 #else
-        changedLocale = std::locale("fr_FR.UTF-8");
+    std::string changedLocale("fr_FR.UTF-8");
 #endif
-    }
-    catch (const std::exception &)
-    {
-        // Silently pass if locale isn't installed on machine.
-        return;
-    }
 
-    tests::common::utilities::locale_guard loc(changedLocale);
+    tests::common::utilities::locale_guard loc(std::locale(changedLocale.c_str()));
 
     uri_builder builder;
     auto const &key = U("key1000");

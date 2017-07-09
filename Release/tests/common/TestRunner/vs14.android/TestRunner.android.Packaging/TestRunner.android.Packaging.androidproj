@@ -24,7 +24,7 @@
     <ProjectVersion>1.0</ProjectVersion>
     <ProjectGuid>{7cf3c460-3486-4106-80cd-eb802dfef373}</ProjectGuid>
   </PropertyGroup>
-  <Import Project="$(AndroidTargetsPath)\Android.Default.props" />
+  <Import Project="$(VCTargetsPath)\AndroidPackaging\Android.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'" Label="Configuration">
     <UseDebugLibraries>true</UseDebugLibraries>
   </PropertyGroup>
@@ -37,28 +37,28 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'" Label="Configuration">
     <UseDebugLibraries>false</UseDebugLibraries>
   </PropertyGroup>
-  <Import Project="$(AndroidTargetsPath)\Android.props" />
+  <Import Project="$(VCTargetsPath)\AndroidPackaging\Android.props" />
   <ImportGroup Label="ExtensionSettings" />
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <AntPackage>
-      <AndroidAppLibName>TestRunner_android</AndroidAppLibName>
+      <AndroidAppLibName>TestRunner.android.NativeActivity</AndroidAppLibName>
     </AntPackage>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM'">
     <AntPackage>
-      <AndroidAppLibName>TestRunner_android</AndroidAppLibName>
+      <AndroidAppLibName>TestRunner.android.NativeActivity</AndroidAppLibName>
     </AntPackage>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
     <AntPackage>
-      <AndroidAppLibName>TestRunner_android</AndroidAppLibName>
+      <AndroidAppLibName>TestRunner.android.NativeActivity</AndroidAppLibName>
     </AntPackage>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
     <AntPackage>
-      <AndroidAppLibName>TestRunner_android</AndroidAppLibName>
+      <AndroidAppLibName>TestRunner.android.NativeActivity</AndroidAppLibName>
     </AntPackage>
   </ItemDefinitionGroup>
 
@@ -73,7 +73,7 @@
       <Project>{d1060d0a-a10e-444d-9f6b-9676ea453f9a}</Project>
     </ProjectReference>
   </ItemGroup>
-  <Import Project="$(AndroidTargetsPath)\Android.targets" />
+  <Import Project="$(VCTargetsPath)\AndroidPackaging\Android.targets" />
   <ImportGroup Label="ExtensionTargets" />
   
   <!-- For some reason build fails if the following directory doesn't exist on command line build -->

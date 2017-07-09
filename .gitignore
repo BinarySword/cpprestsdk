@@ -1,7 +1,6 @@
 #Visual Studio files
 *.o
 *.d
-*.so
 *.[Oo]bj
 *.user
 *.aps
@@ -18,7 +17,6 @@
 *.[Cc]ache
 *.ilk
 *.log
-*.lib
 *.sbr
 *.sdf
 *.sdf
@@ -30,7 +28,6 @@
 *.lastbuildstate
 *.tlog
 *.intermediate
-*.dll
 *.exp
 *.exe
 *.manifest
@@ -56,8 +53,6 @@ xcuserdata
 *.lock
 *~.nib
 *.resfiles
-[Bb]in
-Binaries/
 Intermediate/
 # The packages folder can be ignored because of Package Restore
 **/packages/*

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Peter Thorson. All rights reserved.
+ * Copyright (c) 2013, Peter Thorson. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -28,13 +28,12 @@
 #ifndef WEBSOCKETPP_TRANSPORT_SECURITY_NONE_HPP
 #define WEBSOCKETPP_TRANSPORT_SECURITY_NONE_HPP
 
-#include <websocketpp/transport/asio/security/base.hpp>
-
 #include <websocketpp/common/memory.hpp>
+#include <websocketpp/transport/asio/security/base.hpp>
 
 #include <boost/asio.hpp>
 
-#include <sstream>
+#include <iostream>
 #include <string>
 
 namespace websocketpp {
@@ -160,14 +159,14 @@ protected:
      * @param strand A shared pointer to the connection's asio strand
      * @param is_server Whether or not the endpoint is a server or not.
      */
-    lib::error_code init_asio (io_service_ptr service, strand_ptr, bool)
+    lib::error_code init_asio (io_service_ptr service, strand_ptr strand,
+        bool is_server)
     {
         if (m_state != UNINITIALIZED) {
             return socket::make_error_code(socket::error::invalid_state);
         }
 
-        m_socket = lib::make_shared<boost::asio::ip::tcp::socket>(
-            lib::ref(*service));
+        m_socket.reset(new boost::asio::ip::tcp::socket(*service));
 
         m_state = READY;
 
@@ -248,7 +247,7 @@ protected:
      * @param ec The error code to translate_ec
      * @return The translated error code
      */
-    lib::error_code translate_ec(boost::system::error_code) {
+    lib::error_code translate_ec(boost::system::error_code ec) {
         // We don't know any more information about this error so pass through
         return make_error_code(transport::error::pass_through);
     }

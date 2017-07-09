@@ -243,27 +243,6 @@ namespace json
         static _ASYNCRTIMP value __cdecl number(int32_t value);
 
         /// <summary>
-        /// Creates a number value
-        /// </summary>
-        /// <param name="value">The C++ value to create a JSON value from</param>
-        /// <returns>A JSON number value</returns>
-        static _ASYNCRTIMP value __cdecl number(uint32_t value);
-
-        /// <summary>
-        /// Creates a number value
-        /// </summary>
-        /// <param name="value">The C++ value to create a JSON value from</param>
-        /// <returns>A JSON number value</returns>
-        static _ASYNCRTIMP value __cdecl number(int64_t value);
-
-        /// <summary>
-        /// Creates a number value
-        /// </summary>
-        /// <param name="value">The C++ value to create a JSON value from</param>
-        /// <returns>A JSON number value</returns>
-        static _ASYNCRTIMP value __cdecl number(uint64_t value);
-
-        /// <summary>
         /// Creates a Boolean value
         /// </summary>
         /// <param name="value">The C++ value to create a JSON value from</param>
@@ -492,7 +471,7 @@ public:
         /// Throws <see cref="json_exception"/>  if the value is not a number
         /// </summary>
         /// <returns>An instance of number class</returns>
-        _ASYNCRTIMP const json::number& as_number() const;
+        _ASYNCRTIMP json::number as_number() const;
 
         /// <summary>
         /// Converts the JSON value to a C++ bool, if and only if it is a Boolean value.
@@ -530,7 +509,7 @@ public:
         /// Converts the JSON value to a C++ STL string, if and only if it is a string value.
         /// </summary>
         /// <returns>A C++ STL string representation of the value</returns>
-        _ASYNCRTIMP const utility::string_t& as_string() const;
+        _ASYNCRTIMP utility::string_t as_string() const;
 
         /// <summary>
         /// Compares two JSON values for equality.
@@ -563,18 +542,6 @@ public:
         /// <returns>The value kept in the field; null if the field does not exist</returns>
         CASABLANCA_DEPRECATED("This API is deprecated and will be removed in a future release, use json::value::at() instead.")
         value get(const utility::string_t &key) const;
-
-        /// <summary>
-        /// Erases an element of a JSON array. Throws if index is out of bounds.
-        /// </summary>
-        /// <param name="index">The index of the element to erase in the JSON array.</param>
-        _ASYNCRTIMP void erase(size_t index);
-
-        /// <summary>
-        /// Erases an element of a JSON object. Throws if the key doesn't exist.
-        /// </summary>
-        /// <param name="key">The key of the element to erase in the JSON object.</param>
-        _ASYNCRTIMP void erase(const utility::string_t &key);
 
         /// <summary>
         /// Accesses an element of a JSON array. Throws when index out of bounds.
@@ -625,7 +592,7 @@ public:
         /// <summary>
         /// Accesses an element of a JSON array.
         /// </summary>
-        /// <param name="index">The index of an element in the JSON array</param>
+        /// <param name="key">The index of an element in the JSON array</param>
         /// <returns>The value kept at the array index; null if outside the boundaries of the array</returns>
         CASABLANCA_DEPRECATED("This API is deprecated and will be removed in a future release, use json::value::at() instead.")
         value get(size_t index) const;
@@ -677,6 +644,7 @@ public:
     private:
         std::string _message;
     public:
+        json_exception() {}
         json_exception(const utility::char_t * const &message) : _message(utility::conversions::to_utf8string(message)) { }
 
         // Must be narrow string because it derives from std::exception
@@ -684,6 +652,7 @@ public:
         {
             return _message.c_str();
         }
+        ~json_exception() CPPREST_NOEXCEPT {}
     };
 
     namespace details
@@ -875,30 +844,6 @@ public:
         }
 
         /// <summary>
-        /// Deletes an element of the JSON array.
-        /// </summary>
-        /// <param name="position">A const_iterator to the element to delete.</param>
-        /// <returns>Iterator to the new location of the element following the erased element.</returns>
-        /// <remarks>GCC doesn't support erase with const_iterator on vector yet. In the future this should be changed.</remarks>
-        iterator erase(iterator position)
-        {
-            return m_elements.erase(position);
-        }
-
-        /// <summary>
-        /// Deletes the element at an index of the JSON array.
-        /// </summary>
-        /// <param name="index">The index of the element to delete.</param>
-        void erase(size_type index)
-        {
-            if (index >= m_elements.size())
-            {
-                throw json_exception(_XPLATSTR("index out of bounds"));
-            }
-            m_elements.erase(m_elements.begin() + index);
-        }
-
-        /// <summary>
         /// Accesses an element of a JSON array. Throws when index out of bounds.
         /// </summary>
         /// <param name="index">The index of an element in the JSON array.</param>
@@ -978,6 +923,8 @@ public:
                 sort(m_elements.begin(), m_elements.end(), compare_pairs);
             }
         }
+        object(const object& obj); // non copyable
+        object& operator=(const object& obj); // non copyable
 
     public:
         /// <summary>
@@ -1089,32 +1036,6 @@ public:
         }
 
         /// <summary>
-        /// Deletes an element of the JSON object.
-        /// </summary>
-        /// <param name="position">A const_iterator to the element to delete.</param>
-        /// <returns>Iterator to the new location of the element following the erased element.</returns>
-        /// <remarks>GCC doesn't support erase with const_iterator on vector yet. In the future this should be changed.</remarks>
-        iterator erase(iterator position)
-        {
-            return m_elements.erase(position);
-        }
-
-        /// <summary>
-        /// Deletes an element of the JSON object. If the key doesn't exist, this method throws.
-        /// </summary>
-        /// <param name="key">The key of an element in the JSON object.</param>
-        void erase(const utility::string_t &key)
-        {
-            auto iter = find_by_key(key);
-            if (iter == m_elements.end())
-            {
-                throw web::json::json_exception(_XPLATSTR("Key not found"));
-            }
-
-            m_elements.erase(iter);
-        }
-
-        /// <summary>
         /// Accesses an element of a JSON object. If the key doesn't exist, this method throws.
         /// </summary>
         /// <param name="key">The key of an element in the JSON object.</param>
@@ -1122,10 +1043,9 @@ public:
         json::value& at(const utility::string_t& key)
         {
             auto iter = find_by_key(key);
-            if (iter == m_elements.end())
-            {
+
+            if (iter == m_elements.end() || key != (iter->first))
                 throw web::json::json_exception(_XPLATSTR("Key not found"));
-            }
 
             return iter->second;
         }
@@ -1138,10 +1058,9 @@ public:
         const json::value& at(const utility::string_t& key) const
         {
             auto iter = find_by_key(key);
-            if (iter == m_elements.end())
-            {
+
+            if (iter == m_elements.end() || key != (iter->first))
                 throw web::json::json_exception(_XPLATSTR("Key not found"));
-            }
 
             return iter->second;
         }
@@ -1153,12 +1072,10 @@ public:
         /// <returns>If the key exists, a reference to the value kept in the field, otherwise a newly created null value that will be stored for the given key.</returns>
         json::value& operator[](const utility::string_t& key)
         {
-            auto iter = find_insert_location(key);
+            auto iter = find_by_key(key);
 
-            if (iter == m_elements.end() || key != iter->first)
-            {
+            if (iter == m_elements.end() || key != (iter->first))
                 return m_elements.insert(iter, std::pair<utility::string_t, value>(key, value()))->second;
-            }
 
             return iter->second;
         }
@@ -1170,7 +1087,7 @@ public:
         /// <returns>A const iterator to the value kept in the field.</returns>
         const_iterator find(const utility::string_t& key) const
         {
-            return find_by_key(key);
+            return find_internal(key);
         }
 
         /// <summary>
@@ -1201,7 +1118,7 @@ public:
             return p1.first < key;
         }
 
-        storage_type::iterator find_insert_location(const utility::string_t &key)
+        storage_type::const_iterator find_by_key(const utility::string_t& key) const
         {
             if (m_keep_order)
             {
@@ -1216,7 +1133,7 @@ public:
             }
         }
 
-        storage_type::const_iterator find_by_key(const utility::string_t& key) const
+        storage_type::iterator find_by_key(const utility::string_t& key)
         {
             if (m_keep_order)
             {
@@ -1227,27 +1144,42 @@ public:
             }
             else
             {
-                auto iter = std::lower_bound(m_elements.begin(), m_elements.end(), key, compare_with_key);
-                if (iter != m_elements.end() && key != iter->first)
-                {
-                    return m_elements.end();
-                }
-                return iter;
+                return std::lower_bound(m_elements.begin(), m_elements.end(), key, compare_with_key);
             }
         }
 
-        storage_type::iterator find_by_key(const utility::string_t& key)
+        const json::value& at_internal(const utility::string_t& key) const
         {
-            auto iter = find_insert_location(key);
-            if (iter != m_elements.end() && key != iter->first)
-            {
+            auto iter = find_by_key(key);
+
+            if (iter == m_elements.end() || key != (iter->first))
+                throw web::json::json_exception(_XPLATSTR("Key not found"));
+
+            return iter->second;
+        }
+
+        const_iterator find_internal(const utility::string_t& key) const
+        {
+            auto iter = find_by_key(key);
+
+            if (iter != m_elements.end() && key != (iter->first))
                 return m_elements.end();
-            }
+
+            return iter;
+        }
+
+        iterator find_internal(const utility::string_t& key)
+        {
+            auto iter = find_by_key(key);
+
+            if (iter != m_elements.end() && key != (iter->first))
+                return m_elements.end();
+
             return iter;
         }
 
         storage_type m_elements;
-        bool m_keep_order;
+        const bool m_keep_order;
         friend class details::_Object;
 
         template<typename CharType> friend class json::details::JSON_Parser;
@@ -1454,7 +1386,7 @@ public:
             virtual bool is_integer() const { throw json_exception(_XPLATSTR("not a number")); }
             virtual bool is_double() const { throw json_exception(_XPLATSTR("not a number")); }
 
-            virtual const json::number& as_number() { throw json_exception(_XPLATSTR("not a number")); }
+            virtual json::number as_number() { throw json_exception(_XPLATSTR("not a number")); }
             virtual double as_double() const { throw json_exception(_XPLATSTR("not a number")); }
             virtual int as_integer() const { throw json_exception(_XPLATSTR("not a number")); }
             virtual bool as_bool() const { throw json_exception(_XPLATSTR("not a boolean")); }
@@ -1462,7 +1394,7 @@ public:
             virtual const json::array& as_array() const { throw json_exception(_XPLATSTR("not an array")); }
             virtual json::object& as_object() { throw json_exception(_XPLATSTR("not an object")); }
             virtual const json::object& as_object() const { throw json_exception(_XPLATSTR("not an object")); }
-            virtual const utility::string_t& as_string() const { throw json_exception(_XPLATSTR("not a string")); }
+            virtual utility::string_t as_string() const { throw json_exception(_XPLATSTR("not a string")); }
 
             virtual size_t size() const { return 0; }
 
@@ -1489,11 +1421,18 @@ public:
         class _Null : public _Value
         {
         public:
+
             virtual std::unique_ptr<_Value> _copy_value()
             {
                 return utility::details::make_unique<_Null>();
             }
+
             virtual json::value::value_type type() const { return json::value::Null; }
+
+            _Null() { }
+
+        private:
+            template<typename CharType> friend class json::details::JSON_Parser;
         };
 
         class _Number : public _Value
@@ -1525,7 +1464,7 @@ public:
                 return m_number.to_int32();
             }
 
-            virtual const number& as_number() { return m_number; }
+            virtual number as_number() { return m_number; }
 
         protected:
             virtual void format(std::basic_string<char>& stream) const ;
@@ -1541,7 +1480,6 @@ public:
         class _Boolean : public _Value
         {
         public:
-            _Boolean(bool value) : m_value(value) { }
 
             virtual std::unique_ptr<_Value> _copy_value()
             {
@@ -1566,6 +1504,9 @@ public:
 #endif
         private:
             template<typename CharType> friend class json::details::JSON_Parser;
+        public:
+            _Boolean(bool value) : m_value(value) { }
+        private:
             bool m_value;
         };
 
@@ -1593,6 +1534,19 @@ public:
             { }
 #endif
 
+            _String(const _String& other) : web::json::details::_Value(other)
+            {
+                copy_from(other);
+            }
+
+            _String& operator=(const _String& other)
+            {
+                if (this != &other) {
+                    copy_from(other);
+                }
+                return *this;
+            }
+
             virtual std::unique_ptr<_Value> _copy_value()
             {
                 return utility::details::make_unique<_String>(*this);
@@ -1600,7 +1554,7 @@ public:
 
             virtual json::value::value_type type() const { return json::value::String; }
 
-            virtual const utility::string_t & as_string() const;
+            virtual utility::string_t as_string() const;
 
             virtual void serialize_impl(std::string& str) const
             {
@@ -1637,6 +1591,12 @@ public:
                 format(str);
             }
 
+            void copy_from(const _String& other)
+            {
+                m_string = other.m_string;
+                m_has_escape_char = other.m_has_escape_char;
+            }
+
             std::string as_utf8_string() const;
             utf16string as_utf16_string() const;
 
@@ -1662,26 +1622,31 @@ public:
         public:
 
             _Object(bool keep_order) : m_object(keep_order) { }
+
             _Object(object::storage_type fields, bool keep_order) : m_object(std::move(fields), keep_order) { }
+
+            _ASYNCRTIMP _Object(const _Object& other);
+
+            virtual ~_Object() {}
 
             virtual std::unique_ptr<_Value> _copy_value()
             {
                 return utility::details::make_unique<_Object>(*this);
             }
 
-            virtual json::object& as_object() { return m_object; }
+            virtual json::object& as_object() { return m_object;    }
 
-            virtual const json::object& as_object() const { return m_object; }
+            virtual const json::object& as_object() const { return m_object;    }
 
             virtual json::value::value_type type() const { return json::value::Object; }
 
             virtual bool has_field(const utility::string_t &) const;
 
-            virtual json::value &index(const utility::string_t &key);
+            _ASYNCRTIMP virtual json::value &index(const utility::string_t &key);
 
             bool is_equal(const _Object* other) const
             {
-                if (m_object.size() != other->m_object.size())
+                if ( m_object.size() != other->m_object.size())
                     return false;
 
                 return std::equal(std::begin(m_object), std::end(m_object), std::begin(other->m_object));
@@ -1719,6 +1684,8 @@ public:
             json::object m_object;
 
             template<typename CharType> friend class json::details::JSON_Parser;
+
+            _ASYNCRTIMP void map_fields();
 
             template<typename CharType>
             void format_impl(std::basic_string<CharType>& str) const

@@ -34,4 +34,3 @@
 #include "http_test_utilities.h"
 #include "unittestpp.h"
 #include "os_utilities.h"
-#include "timeout_handler.h"

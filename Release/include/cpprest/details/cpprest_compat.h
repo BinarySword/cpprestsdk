@@ -36,7 +36,12 @@
 
 #define CASABLANCA_UNREFERENCED_PARAMETER(x) (x)
 
+#if _MSC_VER >= 1700
+// Support VS2012 SAL syntax only
 #include <sal.h>
+#else
+#include "cpprest/details/nosal.h"
+#endif
 
 #else // End settings specific to Windows
 

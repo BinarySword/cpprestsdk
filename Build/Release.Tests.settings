@@ -16,12 +16,19 @@
 
   <PropertyGroup>
     <CommonTestIncludeDir>$(TestRoot)\Common\utilities\include;$(TestRoot)\Common\UnitTestpp</CommonTestIncludeDir>
-    <CasablancaIncludeDir>$(BinariesDirectory)\inc;$(CasablancaIncludeDir)</CasablancaIncludeDir>
+    <TestListenerPath>$(TestRoot)\Functional\http\utilities\testlistener</TestListenerPath>
+    <CasablancaIncludeDir>$(BinariesDirectory)\inc;$(CasablancaIncludeDir);$(TestListenerPath)\include;</CasablancaIncludeDir>
   </PropertyGroup>
 
   <!-- Target that can be used to easily strip the AppContainer requirement from a dll -->
   <Target Name="StripAppContainerOnProjectDll">
     <Exec Command="link /edit /appcontainer:no $(OutDir)\$(ProjectName).dll" />
+    
+    <!-- In razzle for some reason the output is in sub directory. -->
+    <ItemGroup Condition="'$(BuildInRazzle)'!=''">
+      <ProjectBinaries Include="$(OutDir)\*" />
+    </ItemGroup>
+    <Copy Condition="'$(BuildInRazzle)'!=''" SourceFiles="@(ProjectBinaries)" DestinationFolder="$(OutDir)..\" />
   </Target>
   
 </Project>

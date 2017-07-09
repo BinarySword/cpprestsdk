@@ -74,9 +74,9 @@ void web::json::value::format(std::basic_string<char>& string) const
 template<typename CharType>
 void web::json::details::append_escape_string(std::basic_string<CharType>& str, const std::basic_string<CharType>& escaped)
 {
-    for (const auto &ch : escaped)
+    for (auto iter = escaped.begin(); iter != escaped.end(); ++iter)
     {
-        switch (ch)
+        switch (*iter)
         {
             case '\"':
                 str += '\\';
@@ -107,22 +107,7 @@ void web::json::details::append_escape_string(std::basic_string<CharType>& str, 
                 str += 't';
                 break;
             default:
-
-                // If a control character then must unicode escaped.
-                if (ch >= 0 && ch <= 0x1F)
-                {
-                    static const std::array<CharType, 16> intToHex = { { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F' } };
-                    str += '\\';
-                    str += 'u';
-                    str += '0';
-                    str += '0';
-                    str += intToHex[(ch & 0xF0) >> 4];
-                    str += intToHex[ch & 0x0F];
-                }
-                else
-                {
-                    str += ch;
-                }
+                str += *iter;
         }
     }
 }
@@ -255,12 +240,12 @@ void web::json::details::_Number::format(std::basic_string<wchar_t>& stream) con
 
 #endif
 
-const utility::string_t & web::json::details::_String::as_string() const
+utility::string_t web::json::details::_String::as_string() const
 {
     return m_string;
 }
 
-const utility::string_t & web::json::value::as_string() const
+utility::string_t web::json::value::as_string() const
 {
     return m_value->as_string();
 }
