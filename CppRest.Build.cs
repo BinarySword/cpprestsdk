@@ -1,68 +1,70 @@
 ﻿// Copyright 1998-2015 Epic Games, Inc. All Rights Reserved.
+
 using UnrealBuildTool;
 
 public class CppRest : ModuleRules
 {
     public CppRest(TargetInfo Target)
     {
-
         Type = ModuleType.External;
 
         PublicIncludePaths.AddRange(
-            new string[]
+            new[]
             {
-                "ThirdParty/CppRest/Release/include",//Relative To "Source" Folder
+                "ThirdParty/CppRest/Release/include", //Relative To "Source" Folder
                 "/usr/local/include"
-				// ... add public include paths required here ...
-			}
-            );
+                // ... add public include paths required here ...
+            }
+        );
 
 
         PrivateIncludePaths.AddRange(
-            new string[]
+            new[]
             {
-                "ThirdParty/CppRest/Release/include",//Relative To "Source" Folder
+                "ThirdParty/CppRest/Release/include", //Relative To "Source" Folder
                 "/usr/local/include"
-				// ... add other private include paths required here ...
-			}
-            );
+                // ... add other private include paths required here ...
+            }
+        );
 
 
         PublicDependencyModuleNames.AddRange(
-            new string[]
+            new[]
             {
                 "Core",
                 "CoreUObject",
                 "Engine"
-				// ... add other public dependencies that you statically link with here ...
-			}
-            );
+                // ... add other public dependencies that you statically link with here ...
+            }
+        );
 
 
         PrivateDependencyModuleNames.AddRange(
-            new string[]
+            new[]
             {
                 "UnrealEd",
                 "LevelEditor",
                 "Slate", "SlateCore",
                 "UMG"
-				// ... add private dependencies that you statically link with here ...	
-			}
-            );
+                // ... add private dependencies that you statically link with here ...	
+            }
+        );
 
         DynamicallyLoadedModuleNames.AddRange(
             new string[]
             {
             }
-            );
+        );
 
-        string CppRestLibraryPath = "";
-        string BoostLibraryPath = "";
-        string SystemLibraryPath = "";
-        string OpenSSLLibraryPath = "";
+        var CppRestLibraryPath = "";
+        var BoostLibraryPath = "";
+        var SystemLibraryPath = "";
+        var OpenSSLLibraryPath = "";
 
         if (Target.Platform == UnrealTargetPlatform.Win64)
+        {
             CppRestLibraryPath = ModuleDirectory + "/Binaries/x64/Release/Windows";
+        }
 
         else if (Target.Platform == UnrealTargetPlatform.Mac)
         {
@@ -74,16 +76,15 @@ public class CppRest : ModuleRules
 
         if (Target.Platform == UnrealTargetPlatform.Win64)
         {
-
             PublicLibraryPaths.AddRange(
-            new string[]
-            {
-                CppRestLibraryPath
-            }
+                new[]
+                {
+                    CppRestLibraryPath
+                }
             );
 
             PublicAdditionalLibraries.AddRange(
-                new string[]
+                new[]
                 {
                     "cpprest140_2_5.lib",
                     "Winhttp.lib",
@@ -91,10 +92,10 @@ public class CppRest : ModuleRules
                     "bcrypt.lib",
                     "crypt32.lib"
                 }
-                );
+            );
 
             Definitions.AddRange(
-                new string[]
+                new[]
                 {
                     "_NO_PPLXIMP=1",
                     "_NO_ASYNCRTIMP=1",
@@ -105,23 +106,23 @@ public class CppRest : ModuleRules
                     "_MBCS=1",
                     "_USRDLL=1"
                 }
-                );
+            );
         }
 
         else if (Target.Platform == UnrealTargetPlatform.Mac)
         {
             PublicLibraryPaths.AddRange(
-            new string[]
-            {
-                CppRestLibraryPath,
-                BoostLibraryPath,
-                SystemLibraryPath,
-                OpenSSLLibraryPath
-            }
+                new[]
+                {
+                    CppRestLibraryPath,
+                    BoostLibraryPath,
+                    SystemLibraryPath,
+                    OpenSSLLibraryPath
+                }
             );
 
             PublicAdditionalLibraries.AddRange(
-                new string[]
+                new[]
                 {
                     CppRestLibraryPath + "/libcpprest.a",
                     BoostLibraryPath + "/libboost_locale-mt.a",
@@ -132,15 +133,15 @@ public class CppRest : ModuleRules
                     OpenSSLLibraryPath + "/libssl.a",
                     SystemLibraryPath + "/libiconv.dylib"
                 }
-                );
+            );
 
             Definitions.AddRange(
-                new string[]
+                new[]
                 {
                     "_NO_PPLXIMP=1",
                     "_NO_ASYNCRTIMP=1"
                 }
-                );
+            );
         }
 
         //Force No Debug Information In Development Builds.
