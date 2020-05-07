@@ -1,10 +1,10 @@
-﻿// Copyright 1998-2015 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2015 Epic Games, Inc. All Rights Reserved.
 
 using UnrealBuildTool;
 
 public class CppRest : ModuleRules
 {
-    public CppRest(TargetInfo Target)
+    public CppRest(ReadOnlyTargetRules Target) : base(Target)
     {
         Type = ModuleType.External;
 
@@ -46,7 +46,7 @@ public class CppRest : ModuleRules
                 "LevelEditor",
                 "Slate", "SlateCore",
                 "UMG"
-                // ... add private dependencies that you statically link with here ...	
+                // ... add private dependencies that you statically link with here ...
             }
         );
 
