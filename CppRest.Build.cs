@@ -1,15 +1,15 @@
-﻿// Copyright 1998-2015 Epic Games, Inc. All Rights Reserved.
+// Copyright 1998-2015 Epic Games, Inc. All Rights Reserved.
 
 using UnrealBuildTool;
 
 public class CppRest : ModuleRules
 {
-    public CppRest(TargetInfo Target)
+    public CppRest(ReadOnlyTargetRules Target) : base(Target)
     {
         Type = ModuleType.External;
 
         PublicIncludePaths.AddRange(
-            new[]
+    			new[]
             {
                 "ThirdParty/CppRest/Release/include", //Relative To "Source" Folder
                 "/usr/local/include"
@@ -19,7 +19,7 @@ public class CppRest : ModuleRules
 
 
         PrivateIncludePaths.AddRange(
-            new[]
+    			new[]
             {
                 "ThirdParty/CppRest/Release/include", //Relative To "Source" Folder
                 "/usr/local/include"
@@ -29,7 +29,7 @@ public class CppRest : ModuleRules
 
 
         PublicDependencyModuleNames.AddRange(
-            new[]
+    			new[]
             {
                 "Core",
                 "CoreUObject",
@@ -40,18 +40,18 @@ public class CppRest : ModuleRules
 
 
         PrivateDependencyModuleNames.AddRange(
-            new[]
+    			new[]
             {
                 "UnrealEd",
                 "LevelEditor",
                 "Slate", "SlateCore",
                 "UMG"
-                // ... add private dependencies that you statically link with here ...	
+                // ... add private dependencies that you statically link with here ...
             }
         );
 
         DynamicallyLoadedModuleNames.AddRange(
-            new string[]
+    			new string[]
             {
             }
         );
@@ -77,14 +77,14 @@ public class CppRest : ModuleRules
         if (Target.Platform == UnrealTargetPlatform.Win64)
         {
             PublicLibraryPaths.AddRange(
-                new[]
+    			    new[]
                 {
                     CppRestLibraryPath
                 }
             );
 
             PublicAdditionalLibraries.AddRange(
-                new[]
+    			    new[]
                 {
                     "cpprest140_2_5.lib",
                     "Winhttp.lib",
@@ -95,7 +95,7 @@ public class CppRest : ModuleRules
             );
 
             Definitions.AddRange(
-                new[]
+    			    new[]
                 {
                     "_NO_PPLXIMP=1",
                     "_NO_ASYNCRTIMP=1",
@@ -112,7 +112,7 @@ public class CppRest : ModuleRules
         else if (Target.Platform == UnrealTargetPlatform.Mac)
         {
             PublicLibraryPaths.AddRange(
-                new[]
+    			    new[]
                 {
                     CppRestLibraryPath,
                     BoostLibraryPath,
@@ -122,7 +122,7 @@ public class CppRest : ModuleRules
             );
 
             PublicAdditionalLibraries.AddRange(
-                new[]
+    			    new[]
                 {
                     CppRestLibraryPath + "/libcpprest.a",
                     BoostLibraryPath + "/libboost_locale-mt.a",
@@ -136,7 +136,7 @@ public class CppRest : ModuleRules
             );
 
             Definitions.AddRange(
-                new[]
+    			    new[]
                 {
                     "_NO_PPLXIMP=1",
                     "_NO_ASYNCRTIMP=1"
