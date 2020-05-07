@@ -144,7 +144,7 @@ public class CppRest : ModuleRules
             );
         }
 
-        //Force No Debug Information In Development Builds.
-        BuildConfiguration.bOmitPCDebugInfoInDevelopment = true;
+        // Force No Debug Information In Development Builds. TODO - Unsure if this is still needed, so have commented out this code for the time being.
+        // BuildConfiguration.bOmitPCDebugInfoInDevelopment = true;
     }
 }
