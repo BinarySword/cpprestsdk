@@ -143,11 +143,5 @@ public class CppRest : ModuleRules
                 }
             );
         }
-
-        //Force No Debug Information In Development Builds.
-        BuildConfiguration.bOmitPCDebugInfoInDevelopment = true;
-        
-        // Add LTCG to the link command line to improve linker performance.
-        BuildConfiguration.bAllowLTCG = true;
     }
 }
